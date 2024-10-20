@@ -1,0 +1,24 @@
+{
+  "name": "Esp32Cli",
+  "version": "0.0.1",
+  "description": "A simple command line interface abstraction for the ESP32",
+  "keywords": "esp32, cli",
+  "repository":
+  {
+    "type": "git",
+    "url": "https://github.com/Fischer-Simon/Esp32Cli.git"
+  },
+  "authors":
+  [
+    {
+      "name": "Simon Fischer"
+    }
+  ],
+  "dependencies": {
+    "h2zero/NimBLE-Arduino": "^1.4.0"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/Fischer-Simon/Esp32Cli",
+  "frameworks": "arduino",
+  "platforms": "espressif32"
+}

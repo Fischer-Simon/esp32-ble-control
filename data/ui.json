@@ -1,0 +1,115 @@
+[
+  {
+    "name": "mirror_leds",
+    "type": "led_control",
+    "config": {
+      "ledName": "Mirror"
+    },
+    "children": [
+      {
+        "name": "flash_grp",
+        "type": "flex_group",
+        "children": [
+          {
+            "name": "flash_brightness",
+            "type": "slider",
+            "style": {
+              "flex": "30%"
+            },
+            "config": {
+              "label": "Flash brightness",
+              "minValue": 0,
+              "maxValue": 1,
+              "step": 0.01,
+              "onChange": "uitest {test_slider}"
+            }
+          },
+          {
+            "name": "flash_speed",
+            "type": "slider",
+            "style": {
+              "flex": "30%"
+            },
+            "config": {
+              "label": "Flash speed",
+              "minValue": 0,
+              "maxValue": 200,
+              "onChange": "uitest {test_slider} {test_slider2}"
+            }
+          },
+          {
+            "name": "flash_btn",
+            "type": "button",
+            "config": {
+              "label": "Flash",
+              "onClick": "led animate mirror 0 {flash_speed} 300 rgb(0,{flash_brightness},0) 2 blend easeInOutSine"
+            }
+          },
+          {
+            "name": "flash_rev_btn",
+            "type": "button",
+            "config": {
+              "label": "Flash Reverse",
+              "onClick": "led animate mirror 0 -{flash_speed} 300 rgb({flash_brightness},0,0) 2 blend easeInOutSine"
+            }
+          }
+        ]
+      },
+      {
+        "name": "leds_grp",
+        "type": "flex_group",
+        "children": [
+          {
+            "name": "map_1_leds",
+            "type": "led_control",
+            "style": {
+              "flex": "1"
+            },
+            "config": {
+              "ledName": "Map 1"
+            }
+          },
+          {
+            "name": "map_2_leds",
+            "type": "led_control",
+            "style": {
+              "flex": "1"
+            },
+            "config": {
+              "ledName": "Map 2"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "reset_btn",
+    "type": "button",
+    "config": {
+      "label": "Reset",
+      "onClick": "reset"
+    }
+  },
+  {
+    "name": "pwm_test",
+    "type": "slider",
+    "config": {
+      "label": "PWM",
+      "minValue": 0,
+      "maxValue": 255,
+      "onChange": "pwm {pwm_test}"
+    }
+  },
+  {
+    "name": "led_test",
+    "type": "slider",
+    "config": {
+      "label": "Green",
+      "minValue": 0,
+      "maxValue": 1,
+      "step": 0.01,
+      "onChange": "led animate led_string_1 0 0 150 rgb(0,{led_test},0)"
+    }
+  }
+]

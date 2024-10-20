@@ -1,0 +1,24 @@
+{
+  "name": "Esp32DeltaOta",
+  "version": "0.0.1",
+  "description": "",
+  "keywords": "esp32, ota, delta",
+  "repository":
+  {
+    "type": "git",
+    "url": "https://github.com/Fischer-Simon/Esp32DeltaOta.git"
+  },
+  "authors":
+  [
+    {
+      "name": "Simon Fischer"
+    }
+  ],
+  "dependencies": {
+    "Esp32Cli": "~1"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/Fischer-Simon/Esp32DeltaOta",
+  "frameworks": "arduino",
+  "platforms": "espressif32"
+}

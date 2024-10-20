@@ -1,0 +1,26 @@
+{
+  "name": "Esp32LedControl",
+  "version": "0.0.1",
+  "description": "Control an animate LEDs",
+  "keywords": "esp32, led, rgb, animation",
+  "repository":
+  {
+    "type": "git",
+    "url": "https://github.com/Fischer-Simon/Esp32LedControl.git"
+  },
+  "authors":
+  [
+    {
+      "name": "Simon Fischer"
+    }
+  ],
+  "dependencies": {
+    "Esp32Cli": "~0",
+    "bblanchon/ArduinoJson": "^7.2.0",
+    "makuna/NeoPixelBus": "^2.7.1"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/Fischer-Simon/Esp32LedControl",
+  "frameworks": "arduino",
+  "platforms": "espressif32"
+}

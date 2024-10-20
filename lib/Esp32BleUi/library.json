@@ -1,0 +1,27 @@
+{
+  "name": "Esp32BleUi",
+  "version": "0.0.1",
+  "description": "Control an ESP32 over BLE",
+  "keywords": "esp32, ble, cli",
+  "repository":
+  {
+    "type": "git",
+    "url": "https://github.com/Fischer-Simon/Esp32BleUi.git"
+  },
+  "authors":
+  [
+    {
+      "name": "Simon Fischer"
+    }
+  ],
+  "dependencies": {
+    "Esp32Cli": "~0"
+  },
+  "headers": [
+    "Esp32BleUi.h"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/Fischer-Simon/Esp32BleUi",
+  "frameworks": "arduino",
+  "platforms": "espressif32"
+}

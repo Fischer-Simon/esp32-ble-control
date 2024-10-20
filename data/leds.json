@@ -1,0 +1,33 @@
+{
+  "Test LEDs": {
+    "type": "NeoPixelRgb",
+    "pixelCount": 20,
+    "pin": 1,
+    "rmtChannel": 0
+  },
+  "Map 1": {
+    "type": "MapView",
+    "parent": "Test LEDs",
+    "defaultBrightness": 0.2,
+    "primaryColor": "red",
+    "ledMap": ["0-7"]
+  },
+  "Map 2": {
+    "type": "MapView",
+    "parent": "Test LEDs",
+    "defaultBrightness": 0.2,
+    "primaryColor": "blue",
+    "ledMap": ["15-8"]
+  },
+  "Map 3": {
+    "type": "MapView",
+    "parent": "Test LEDs",
+    "defaultBrightness": 0.3,
+    "primaryColor": "green",
+    "ledMap": [16, 17, "19-20", 18]
+  },
+  "Mirror": {
+    "type": "MirrorView",
+    "parents": ["Map 1", "Map 2"]
+  }
+}
