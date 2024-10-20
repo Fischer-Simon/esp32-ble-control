@@ -35,7 +35,7 @@ public:
     explicit LuaLoadCommand(const std::shared_ptr<Lua>& lua) : LuaCommand{lua} {
     }
 
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) override {
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override {
         if (argv.size() != 2) {
             Esp32Cli::Cli::printUsage(io, commandName, *this);
             return;
@@ -57,7 +57,7 @@ public:
     explicit LuaRunCommand(const std::shared_ptr<Lua>& lua) : LuaCommand{lua} {
     }
 
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) override {
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override {
         if (argv.size() != 2) {
             Esp32Cli::Cli::printUsage(io, commandName, *this);
             return;
@@ -79,7 +79,7 @@ public:
     explicit LuaCallCommand(const std::shared_ptr<Lua>& lua) : LuaCommand{lua} {
     }
 
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) override {
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override {
         if (argv.size() < 2) {
             Esp32Cli::Cli::printUsage(io, commandName, *this);
             return;
@@ -129,8 +129,8 @@ public:
 };
 
 LuaCommandGroup::LuaCommandGroup(const std::shared_ptr<Lua>& lua) {
-    addSubCommand<LuaLoadCommand>("load", lua);
-    addSubCommand<LuaRunCommand>("run", lua);
-    addSubCommand<LuaCallCommand>("call", lua);
+    addCommand<LuaLoadCommand>("load", lua);
+    addCommand<LuaRunCommand>("run", lua);
+    addCommand<LuaCallCommand>("call", lua);
 }
 }

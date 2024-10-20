@@ -1,0 +1,6 @@
+{
+  "name": "LightweightMap",
+  "version": "0.0.1",
+  "description": "A small memory efficient alternative to std::map",
+  "keywords": "esp32, map"
+}

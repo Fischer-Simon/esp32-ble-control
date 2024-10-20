@@ -21,25 +21,13 @@
 #if ESP32_CLI_ENABLE_FS_COMMANDS
 
 namespace Esp32Cli {
-void ScriptCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) {
+void ScriptCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const {
     if (argv.size() < 2) {
         Cli::printUsage(io, commandName, *this);
         return;
     }
-    m_input = fopen(argv[1].c_str(), "r");
-    if (!m_input) {
-        io.printf("File %s not found\n", argv[1].c_str());
-        return;
-    }
-
-    fseek(m_input, 0, SEEK_END);
-    m_bytesLeft = ftell(m_input);
-    fseek(m_input, 0, SEEK_SET);
-
-    m_output = &io;
-    executeCommandLine(ExecType::Blocking);
-    m_output = nullptr;
-    fclose(m_input);
+    ScriptClient client{m_cli, argv[1].c_str(), &io};
+    client.executeCommandLine(Client::ExecType::Blocking);
 }
 
 void ScriptCommand::printUsage(Print& output) const {
@@ -50,11 +38,30 @@ void ScriptCommand::printHelp(Print& output, const std::string& commandName, std
     output.println("Run commands from a file");
 }
 
-size_t ScriptCommand::write(const uint8_t* buffer, size_t size) {
+ScriptCommand::ScriptClient::ScriptClient(std::shared_ptr<Cli> cli, const char* fileName, Stream* output)
+        : Client{std::move(cli)},
+          m_output{output} {
+    m_input = fopen(fileName, "r");
+    if (!m_input) {
+        output->printf("File %s not found\n", fileName);
+        return;
+    }
+
+    fseek(m_input, 0, SEEK_END);
+    m_bytesLeft = ftell(m_input);
+    fseek(m_input, 0, SEEK_SET);
+}
+
+ScriptCommand::ScriptClient::~ScriptClient() {
+    m_output = nullptr;
+    fclose(m_input);
+}
+
+size_t ScriptCommand::ScriptClient::write(const uint8_t* buffer, size_t size) {
     return m_output->write(buffer, size);
 }
 
-size_t ScriptCommand::write(uint8_t c) {
+size_t ScriptCommand::ScriptClient::write(uint8_t c) {
     if (!m_output) {
         return 0;
     }
@@ -62,21 +69,21 @@ size_t ScriptCommand::write(uint8_t c) {
     return 1;
 }
 
-int ScriptCommand::available() {
+int ScriptCommand::ScriptClient::available() {
     if (!m_input) {
         return 0;
     }
     return static_cast<int>(m_bytesLeft);
 }
 
-size_t ScriptCommand::readBytes(char* buffer, size_t length) {
+size_t ScriptCommand::ScriptClient::readBytes(char* buffer, size_t length) {
     const size_t readSize = min(length, m_bytesLeft);
     fread(buffer, readSize, 1, m_input);
     m_bytesLeft -= readSize;
     return readSize;
 }
 
-int ScriptCommand::read() {
+int ScriptCommand::ScriptClient::read() {
     const int result = fgetc(m_input);
     if (result > 0) {
         m_bytesLeft--;
@@ -84,7 +91,7 @@ int ScriptCommand::read() {
     return result;
 }
 
-int ScriptCommand::peek() {
+int ScriptCommand::ScriptClient::peek() {
     return -1; // TODO: Implement peek for file io.
 }
 }

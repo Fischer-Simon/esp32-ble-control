@@ -20,6 +20,7 @@
 
 #include <Esp32Cli/Command.h>
 #include <Esp32Cli/CommandGroup.h>
+#include <LedView.h>
 
 class LedManager;
 
@@ -29,6 +30,8 @@ public:
     explicit LedCommand(const std::shared_ptr<LedManager>& ledManager);
 
 protected:
+    using AnimationConfig = LedView::AnimationConfig;
+
     std::shared_ptr<LedManager> m_ledManager;
 };
 
@@ -36,14 +39,14 @@ class LsCommand : public LedCommand {
 public:
     explicit LsCommand(const std::shared_ptr<LedManager>& ledManager) : LedCommand(ledManager) {}
 
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) override;
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override;
 };
 
 class CatCommand : public LedCommand {
 public:
     explicit CatCommand(const std::shared_ptr<LedManager>& ledManager) : LedCommand(ledManager) {}
 
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) override ;
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override ;
 
     void printUsage(Print& output) const override {
         output.println("<name>");
@@ -58,7 +61,7 @@ class DebugCommand : public LedCommand {
 public:
     explicit DebugCommand(const std::shared_ptr<LedManager>& ledManager) : LedCommand(ledManager) {}
 
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) override ;
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override ;
 
     void printUsage(Print& output) const override {
         output.println("<name>");
@@ -73,7 +76,7 @@ class GetPosCommand : public LedCommand {
 public:
     explicit GetPosCommand(const std::shared_ptr<LedManager>& ledManager) : LedCommand(ledManager) {}
 
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) override ;
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override ;
 
     void printUsage(Print& output) const override {
         output.println("<name> <index>");
@@ -88,7 +91,7 @@ class SetBrightnessCommand : public LedCommand {
 public:
     explicit SetBrightnessCommand(const std::shared_ptr<LedManager>& ledManager) : LedCommand(ledManager) {}
 
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) override;
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override;
 
     void printUsage(Print& output) const override {
         output.println("<name> <brightness>");
@@ -103,7 +106,7 @@ class SetPixelCommand : public LedCommand {
 public:
     explicit SetPixelCommand(const std::shared_ptr<LedManager>& ledManager) : LedCommand(ledManager) {}
 
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) override;
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override;
 
     void printUsage(Print& output) const override {
         output.println("<name> <index> <color>");
@@ -118,7 +121,7 @@ class AnimatePixelCommand : public LedCommand {
 public:
     explicit AnimatePixelCommand(const std::shared_ptr<LedManager>& ledManager) : LedCommand(ledManager) {}
 
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) override;
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override;
 
     void printUsage(Print& output) const override {
         output.println("<name> <index> <delay> <duration> <color>");
@@ -133,7 +136,7 @@ class AnimateCommand : public LedCommand {
 public:
     explicit AnimateCommand(const std::shared_ptr<LedManager>& ledManager) : LedCommand(ledManager) {}
 
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) override;
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override;
 
     void printUsage(Print& output) const override {
         output.println("<name> <delay> <pixel_delay> <duration> <color> [<half_cycles> <blending> <easing>]");
@@ -148,7 +151,7 @@ class Animate3DCommand : public LedCommand {
 public:
     explicit Animate3DCommand(const std::shared_ptr<LedManager>& ledManager) : LedCommand(ledManager) {}
 
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) override;
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override;
 
     void printUsage(Print& output) const override {
         output.println("<name> <delay> <pixel_delay> <duration> <x> <y> <z> <color>");
@@ -163,7 +166,7 @@ class WriteCommand : public LedCommand {
 public:
     explicit WriteCommand(const std::shared_ptr<LedManager>& ledManager) : LedCommand(ledManager) {}
 
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) override;
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override;
 
     void printUsage(Print& output) const override {
         output.println("<name> [<offset>] <pixel_data>");
@@ -178,7 +181,7 @@ class ShowCommand : public LedCommand {
 public:
     explicit ShowCommand(const std::shared_ptr<LedManager>& ledManager) : LedCommand(ledManager) {}
 
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) override;
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override;
 
     void printUsage(Print& output) const override {
         output.println("<name>");

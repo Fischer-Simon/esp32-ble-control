@@ -18,22 +18,23 @@
 
 #pragma once
 
+#include "LedString.h"
+#include "LedView.h"
+
 #include <functional>
 #include <map>
 #include <memory>
-
-#include "LedString.h"
-#include "LedView.h"
+#include <LightweightMap.h>
 
 class LedManager {
 public:
     std::shared_ptr<LedView> getLedViewByName(const std::string& name);
 
-    const std::map<std::string, std::shared_ptr<LedView> >& getLedViews() const {
-        return m_ledViews;
+    const std::vector<LightweightMap<std::shared_ptr<LedView>>::entry_t>& getLedViews() const {
+        return m_ledViews.getEntries();
     }
 
-    void addLedView(std::string name, std::shared_ptr<LedView> ledView);
+    void addLedView(const std::string& name, std::shared_ptr<LedView> ledView);
 
     void loadColorsFromConfig(const std::string& namedColorPath);
 
@@ -42,8 +43,8 @@ public:
     HslColor parseColor(const std::string& colorString, const std::shared_ptr<LedView>& ledView = nullptr) const;
 
 private:
-    void addConfigErrorView(std::string name, const std::string& configKey, const std::string& error = "");
+    void addConfigErrorView(const std::string& name, const std::string& configKey, const std::string& error = "");
 
-    std::map<std::string, std::shared_ptr<LedView> > m_ledViews;
-    std::map<std::string, HslColor> m_namedColors;
+    LightweightMap<HslColor> m_namedColors;
+    LightweightMap<std::shared_ptr<LedView>> m_ledViews;
 };

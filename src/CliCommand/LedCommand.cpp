@@ -33,13 +33,13 @@ namespace CliCommand {
 LedCommand::LedCommand(const std::shared_ptr<LedManager>& ledManager) : m_ledManager{ledManager} {
 }
 
-void LsCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) {
+void LsCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const {
     for (const auto& led: m_ledManager->getLedViews()) {
-        io.printf("%16s %16s  %s\n\r", led.first.c_str(), led.second->getType(), led.second->getName().c_str());
+        io.printf("%16s %16s  %s\n\r", led.first, led.second->getType(), led.second->getName().c_str());
     }
 }
 
-void CatCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) {
+void CatCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const {
     if (argv.size() != 2) {
         Esp32Cli::Cli::printUsage(io, commandName, *this);
         return;
@@ -52,7 +52,7 @@ void CatCommand::execute(Stream& io, const std::string& commandName, std::vector
     io.println();
 }
 
-void DebugCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) {
+void DebugCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const {
     if (argv.size() != 2) {
         Esp32Cli::Cli::printUsage(io, commandName, *this);
         return;
@@ -60,7 +60,7 @@ void DebugCommand::execute(Stream& io, const std::string& commandName, std::vect
     auto ledStrip = LED_STRIP_FROM_FIRST_ARG;
 }
 
-void GetPosCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) {
+void GetPosCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const {
     if (argv.size() != 3) {
         Esp32Cli::Cli::printUsage(io, commandName, *this);
         return;
@@ -70,7 +70,7 @@ void GetPosCommand::execute(Stream& io, const std::string& commandName, std::vec
     io.printf("Local: %i, %i, %i\nRelative: <TODO>\nGlobal: <TODO>\n", ledPosition.x, ledPosition.y, ledPosition.z);
 }
 
-void SetBrightnessCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) {
+void SetBrightnessCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const {
     if (argv.size() != 3) {
         Esp32Cli::Cli::printUsage(io, commandName, *this);
         return;
@@ -78,16 +78,15 @@ void SetBrightnessCommand::execute(Stream& io, const std::string& commandName, s
     auto ledStrip = LED_STRIP_FROM_FIRST_ARG;
     float brightness = strtof(argv[2].c_str(), nullptr);
     ledStrip->setBrightness(brightness);
-    LedView::AnimationConfig animation{
+    std::unique_ptr<AnimationConfig> animation{new AnimationConfig{
             ledStrip->getAnimationTargetColor(),
-            std::chrono::milliseconds(0),
-            std::chrono::milliseconds(0),
-            std::chrono::milliseconds(150),
-    };
+            AnimationConfig::LedDelayMs(0),
+            AnimationConfig::LedDurationMs(150),
+    }};
     ledStrip->addAnimation(std::move(animation));
 }
 
-void SetPixelCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) {
+void SetPixelCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const {
     if (argv.size() != 4) {
         Esp32Cli::Cli::printUsage(io, commandName, *this);
         return;
@@ -95,16 +94,16 @@ void SetPixelCommand::execute(Stream& io, const std::string& commandName, std::v
     auto ledStrip = LED_STRIP_FROM_FIRST_ARG;
     Led::Led::index_t ledIndex = strtoul(argv[2].c_str(), nullptr, 0);
     auto ledColor = m_ledManager->parseColor(argv[3], ledStrip);
-    auto animation = LedView::AnimationConfig{
+    std::unique_ptr<AnimationConfig> animation{new AnimationConfig{
             ledColor,
-            std::chrono::milliseconds(0),
-            std::chrono::milliseconds(1)
-    };
-    animation.leds = {ledIndex};
+            AnimationConfig::LedDelayMs(0),
+            AnimationConfig::LedDurationMs(1),
+    }};
+    animation->leds = {ledIndex};
     ledStrip->addAnimation(std::move(animation));
 }
 
-void AnimatePixelCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) {
+void AnimatePixelCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const {
     if (argv.size() != 6) {
         Esp32Cli::Cli::printUsage(io, commandName, *this);
         return;
@@ -114,17 +113,17 @@ void AnimatePixelCommand::execute(Stream& io, const std::string& commandName, st
     auto delay = std::chrono::milliseconds(strtoul(argv[3].c_str(), nullptr, 0));
     auto duration = std::chrono::milliseconds(strtol(argv[4].c_str(), nullptr, 0));
     auto ledColor = m_ledManager->parseColor(argv[5], ledStrip);
-    auto animation = LedView::AnimationConfig{
+    std::unique_ptr<AnimationConfig> animation{new AnimationConfig{
             ledColor,
             delay,
-            std::chrono::milliseconds(0),
+            AnimationConfig::LedDelayMs(0),
             duration
-    };
-    animation.leds = {ledIndex};
+    }};
+    animation->leds = {ledIndex};
     ledStrip->addAnimation(std::move(animation));
 }
 
-void AnimateCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) {
+void AnimateCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const {
     if (argv.size() != 6 && argv.size() != 9) {
         Esp32Cli::Cli::printUsage(io, commandName, *this);
         return;
@@ -135,59 +134,62 @@ void AnimateCommand::execute(Stream& io, const std::string& commandName, std::ve
     auto duration = std::chrono::milliseconds(strtoul(argv[4].c_str(), nullptr, 0));
     auto ledColor = m_ledManager->parseColor(argv[5], ledStrip);
 
+    std::unique_ptr<AnimationConfig> animation;
     if (argv.size() == 6) {
-        ledStrip->addAnimation({
-                                       ledColor,
-                                       delay,
-                                       ledDelay,
-                                       duration,
-                               });
-        return;
+        animation.reset(new AnimationConfig{
+                ledColor,
+                delay,
+                ledDelay,
+                duration,
+        });
+    } else {
+        uint8_t halfCycles = strtoul(argv[6].c_str(), nullptr, 0);
+        const std::string& blendFunc = argv[7];
+        const std::string& easeFunc = argv[8];
+
+        Led::Blending blending = Led::Blending::Blend;
+        if (blendFunc == "add") {
+            blending = Led::Blending::Add;
+        } else if (blendFunc == "overwrite") {
+            blending = Led::Blending::Overwrite;
+        }
+
+        animation.reset(new AnimationConfig{
+                blending,
+                Easing::getFuncByName(easeFunc),
+                ledColor,
+                delay,
+                ledDelay,
+                duration,
+                halfCycles,
+        });
     }
 
-    uint8_t halfCycles = strtoul(argv[6].c_str(), nullptr, 0);
-    const std::string& blendFunc = argv[7];
-    const std::string& easeFunc = argv[8];
-
-    Led::Blending blending = Led::Blending::Blend;
-    if (blendFunc == "add") {
-        blending = Led::Blending::Add;
-    } else if (blendFunc == "overwrite") {
-        blending = Led::Blending::Overwrite;
-    }
-
-    ledStrip->addAnimation({
-                                   blending,
-                                   Easing::getFuncByName(easeFunc),
-                                   ledColor,
-                                   delay,
-                                   ledDelay,
-                                   duration,
-                                   halfCycles,
-                           });
+    ledStrip->addAnimation(std::move(animation));
 }
 
-void Animate3DCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) {
+void Animate3DCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const {
     // TODO: 3D position aware LEDs
 }
 
-void WriteCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) {
+void WriteCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const {
 }
 
-void ShowCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) {
+void ShowCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const {
 }
 
-LedCommandGroup::LedCommandGroup(const std::shared_ptr<LedManager>& ledManager) {
-    addSubCommand<LsCommand>("ls", ledManager);
-    addSubCommand<CatCommand>("cat", ledManager);
-    addSubCommand<DebugCommand>("debug", ledManager);
-    addSubCommand<GetPosCommand>("get-pos", ledManager);
-    addSubCommand<SetBrightnessCommand>("set-brightness", ledManager);
-    addSubCommand<SetPixelCommand>("set-pixel", ledManager);
-    addSubCommand<AnimatePixelCommand>("animate-pixel", ledManager);
-    addSubCommand<AnimateCommand>("animate", ledManager);
-    addSubCommand<Animate3DCommand>("animate-3d", ledManager);
-    addSubCommand<WriteCommand>("write", ledManager);
-    addSubCommand<ShowCommand>("show", ledManager);
+LedCommandGroup::LedCommandGroup(
+        const std::shared_ptr<LedManager>& ledManager) {
+    addCommand<LsCommand>("ls", ledManager);
+    addCommand<CatCommand>("cat", ledManager);
+    addCommand<DebugCommand>("debug", ledManager);
+    addCommand<GetPosCommand>("get-pos", ledManager);
+    addCommand<SetBrightnessCommand>("set-brightness", ledManager);
+    addCommand<SetPixelCommand>("set-pixel", ledManager);
+    addCommand<AnimatePixelCommand>("animate-pixel", ledManager);
+    addCommand<AnimateCommand>("animate", ledManager);
+    addCommand<Animate3DCommand>("animate-3d", ledManager);
+    addCommand<WriteCommand>("write", ledManager);
+    addCommand<ShowCommand>("show", ledManager);
 }
 }

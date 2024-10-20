@@ -28,7 +28,7 @@ class HostnameCommand : public Command {
 public:
     explicit HostnameCommand(Cli& cli) : m_cli{cli} {}
 
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) override;
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override;
 
 private:
     Cli& m_cli;
@@ -36,12 +36,12 @@ private:
 
 class MemCommand : public Command {
 public:
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) override;
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override;
 };
 
 class ResetCommand : public Command {
 public:
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) override;
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override;
 };
 
 #if ESP32_CLI_ENABLE_TELNET

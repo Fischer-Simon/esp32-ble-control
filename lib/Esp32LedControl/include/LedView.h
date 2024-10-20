@@ -30,6 +30,10 @@ public:
     using Animation = Led::Animation;
 
     struct AnimationConfig {
+        using StartDelayMs = std::chrono::milliseconds;
+        using LedDelayMs = std::chrono::milliseconds;
+        using LedDurationMs = std::chrono::milliseconds;
+
         Led::Blending blending;
         ease_func_t easing;
         HslColor targetColor;
@@ -109,7 +113,7 @@ public:
         return m_primaryColor;
     }
 
-    virtual void addAnimation(AnimationConfig) = 0;
+    virtual void addAnimation(std::unique_ptr<AnimationConfig> config) = 0;
 
     void updateAnimationTargetColor(const HslColor& color, std::chrono::system_clock::time_point animationEnd) {
         if (animationEnd > m_currentAnimationEnd) {
@@ -179,7 +183,7 @@ public:
         return m_parent->getLedPosition(m_ledMap[i]);
     }
 
-    void addAnimation(AnimationConfig config) override;
+    void addAnimation(std::unique_ptr<AnimationConfig> config) override;
 
 private:
     std::shared_ptr<LedView> m_parent;
@@ -222,7 +226,7 @@ public:
 
     float getBrightness() const override;
 
-    void addAnimation(AnimationConfig) override;
+    void addAnimation(std::unique_ptr<AnimationConfig> config) override;
 
     void setBrightness(float brightness) override;
 
@@ -252,6 +256,6 @@ public:
         return {0, 0, 0};
     }
 
-    void addAnimation(AnimationConfig) override {
+    void addAnimation(std::unique_ptr<AnimationConfig> config) override {
     }
 };

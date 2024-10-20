@@ -49,23 +49,19 @@ void Cli::setFirmwareInfo(std::string firmwareInfo) {
     m_firmwareInfo = std::move(firmwareInfo);
 }
 
-void Cli::addCommand(std::string name, std::shared_ptr<Command> command) {
-    m_commands.emplace(std::move(name), std::move(command));
-}
-
 void Cli::executeCommand(Stream& io, std::vector<std::string>& argv) const {
     if (argv.empty()) {
         return;
     }
 
-    const std::string commandName = argv.front();
-    const auto command = m_commands.find(commandName);
-    if (command == m_commands.end()) {
+    const std::string& commandName = argv.front();
+
+    auto command = getCommand(commandName.c_str());
+    if (command == nullptr) {
         printCommandNotFound(io, commandName);
         return;
     }
-
-    command->second->execute(io, commandName, argv);
+    command->execute(io, commandName, argv);
 }
 
 void Cli::printCommandNotFound(Print& output, const std::string& commandName) const {
@@ -95,17 +91,17 @@ void Cli::printPrompt(Print& output) const {
     output.print("> ");
 }
 
-void Cli::HelpCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) {
+void Cli::HelpCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const {
     if (argv.size() <= 1) {
         io.print("Available commands: ");
         bool isFirst = true;
-        for (auto& command: m_cli.m_commands) {
+        for (auto& command: m_cli.m_commands.getEntries()) {
             if (isFirst) {
                 isFirst = false;
             } else {
                 io.print(", ");
             }
-            io.print(command.first.c_str());
+            io.print(command.first);
         }
         io.println();
         io.println("Type help <command> for more information.");
@@ -113,9 +109,9 @@ void Cli::HelpCommand::execute(Stream& io, const std::string& commandName, std::
     }
 
     argv.erase(argv.begin());
-    const auto command = m_cli.m_commands.find(argv[0]);
-    if (command != m_cli.m_commands.end()) {
-        command->second->printHelp(io, argv[0], argv);
+    const auto command = m_cli.getCommand(argv[0].c_str());
+    if (command != nullptr) {
+        command->printHelp(io, argv[0], argv);
     } else {
         io.printf("help: %s: no such command\n", argv[0].c_str());
     }

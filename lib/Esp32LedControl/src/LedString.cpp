@@ -40,41 +40,41 @@ LedString::~LedString() {
     xTimerDelete(m_updateTimer, pdMS_TO_TICKS(200));
 }
 
-void LedString::addAnimation(AnimationConfig config) {
-    if (config.leds.empty()) {
-        config.leds.resize(m_ledCount);
+void LedString::addAnimation(std::unique_ptr<AnimationConfig> config) {
+    if (config->leds.empty()) {
+        config->leds.resize(m_ledCount);
         for (led_index_t i = 0; i < m_ledCount; i++) {
-            config.leds[i] = i;
+            config->leds[i] = i;
         }
     }
 
-    if (config.ledDelay < std::chrono::milliseconds(0)) {
-        config.ledDelay *= -1;
-        std::reverse(config.leds.begin(), config.leds.end());
+    if (config->ledDelay < std::chrono::milliseconds(0)) {
+        config->ledDelay *= -1;
+        std::reverse(config->leds.begin(), config->leds.end());
     }
 
     const std::default_random_engine::result_type randomSeed = esp_random();
-    const auto startTime = std::chrono::system_clock::now() + config.startDelay;
-    const auto endTime = startTime + (config.leds.size() * config.ledDelay) + config.ledDuration;
+    const auto startTime = std::chrono::system_clock::now() + config->startDelay;
+    const auto endTime = startTime + (config->leds.size() * config->ledDelay) + config->ledDuration;
 
-    if (config.halfCycles % 2 == 1 && config.blending != Led::Blending::Add) {
-        for (auto& ledView: config.affectedLedViews) {
-            ledView->updateAnimationTargetColor(config.targetColor, endTime);
+    if (config->halfCycles % 2 == 1 && config->blending != Led::Blending::Add) {
+        for (auto& ledView: config->affectedLedViews) {
+            ledView->updateAnimationTargetColor(config->targetColor, endTime);
         }
     }
 
     std::unique_lock<std::mutex> animationsLock{m_animationsMutex};
     m_animations.emplace_back(Animation{
         .randomSeed = randomSeed,
-        .blending = config.blending,
-        .easing = config.easing,
-        .targetColor = HslColor{config.targetColor.H, config.targetColor.S, config.targetColor.L * config.targetBrightness},
+        .blending = config->blending,
+        .easing = config->easing,
+        .targetColor = HslColor{config->targetColor.H, config->targetColor.S, config->targetColor.L * config->targetBrightness},
         .startTime = startTime,
-        .ledDuration = config.ledDuration,
-        .ledDelay = config.ledDelay,
-        .halfCycles = config.halfCycles,
+        .ledDuration = config->ledDuration,
+        .ledDelay = config->ledDelay,
+        .halfCycles = config->halfCycles,
         .endTime = endTime,
-        .leds = std::move(config.leds),
+        .leds = std::move(config->leds),
     });
     std::sort(m_animations.begin(), m_animations.end(), [](const Animation& lhs, const Animation& rhs) {
         return lhs.endTime < rhs.endTime;

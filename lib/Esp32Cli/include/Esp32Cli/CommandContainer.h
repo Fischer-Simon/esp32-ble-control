@@ -18,32 +18,38 @@
 
 #pragma once
 
-#include <Arduino.h>
+#include "Command.h"
+
+#include <LightweightMap.h>
+
+#include <memory>
 #include <vector>
-#include <string>
 
 namespace Esp32Cli {
-class Command {
+class CommandContainer {
 public:
-    Command() = default;
-    Command(const Command&) = delete;
+    virtual ~CommandContainer() = default;
 
-    virtual ~Command() = default;
-
-    /**
-     * Execute the command.
-     * @param io Command input and output
-     * @param commandName Printable name for the command. Includes parent commands in case this is a sub command.
-     * @param argv Command arguments. First entry is always the single name of the current command not including potential parent commands.
-     */
-    virtual void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const = 0;
-
-    virtual void printUsage(Print& output) const {
-        output.println();
+    template<
+            typename CommandT,
+            typename... Args
+    >
+    void addCommand(const char* name, Args&& ... args) {
+        addCommand(name, std::unique_ptr<CommandT>(new CommandT(std::forward<Args>(args)...)));
     }
 
-    virtual void printHelp(Print& output, const std::string& commandName, std::vector<std::string>& argv) const {
-        printUsage(output);
+    void addCommand(const char* name, std::unique_ptr<Command> command) {
+        m_commands.set(name, std::move(command));
     }
+
+protected:
+    const Command* getCommand(const char* name) const {
+        auto it = m_commands.find(name);
+        if (it != m_commands.end()) {
+            return it->second.get();
+        }
+    }
+
+    LightweightMap<std::unique_ptr<Command>> m_commands;
 };
 }

@@ -23,65 +23,53 @@ namespace Esp32Cli {
 
 void CommandGroup::printHelp(Print& output, const std::string& commandName, std::vector<std::string>& argv) const {
     if (argv.size() > 1) {
-        printSubCommandHelp(output, commandName, argv);
+        const std::string mainCommandName = argv[0];
+        const std::string subCommandName = argv[1];
+        const Command* command = getCommand(subCommandName.c_str());
+        if (command == nullptr) {
+            output.printf("%s: %s: no such sub command\n", commandName.c_str(), subCommandName.c_str());
+            return;
+        }
+
+        argv.erase(argv.begin());
+        command->printHelp(output, mainCommandName + " " + subCommandName, argv);
         return;
     }
 
     Cli::printUsage(output, commandName, *this);
-    for (const auto& subCommand: m_subCommands) {
-        Cli::printUsage(output, commandName + " " + subCommand.first, *subCommand.second);
+    for (const auto& command: m_commands.getEntries()) {
+        Cli::printUsage(output, commandName + " " + command.first, *command.second);
     }
 }
 
-void CommandGroup::addSubCommand(std::string name, std::shared_ptr<Command> command) {
-    m_subCommands.emplace(std::move(name), std::move(command));
-}
-
-void CommandGroup::executeSubCommands(Stream& io, const std::string& commandName, std::vector<std::string>& argv) {
+void CommandGroup::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const {
     if (argv.size() < 2) {
         Cli::printUsage(io, commandName, *this);
         return;
     }
 
-    const auto command = m_subCommands.find(argv[1]);
-    if (command == m_subCommands.end()) {
+    const Command* command = getCommand(argv[1].c_str());
+    if (command == nullptr) {
         Cli::printUsage(io, commandName, *this);
         return;
     }
 
     argv.erase(argv.begin());
-    command->second->execute(io, commandName + " " + argv[0], argv);
+    command->execute(io, commandName + " " + argv[0], argv);
 }
 
-void CommandGroup::printSubCommandUsage(Print& output) const {
+void CommandGroup::printUsage(Print& output) const {
     output.print('[');
     bool first = true;
-    for (const auto& subCommand : m_subCommands) {
+    for (const auto& command : m_commands.getEntries()) {
         if (first) {
             first = false;
         } else {
             output.print(',');
         }
-        output.print(subCommand.first.c_str());
+        output.print(command.first);
     }
     output.println("] <...>");
-}
-
-void CommandGroup::printSubCommandHelp(Print& output, const std::string& commandName, std::vector<std::string>& argv) const {
-    if (argv.size() < 2) {
-        return;
-    }
-
-    const std::string mainCommandName = argv[0];
-    const std::string subCommandName = argv[1];
-    const auto command = m_subCommands.find(subCommandName);
-    if (command == m_subCommands.end()) {
-        output.printf("%s: %s: no such sub command\n", argv[0].c_str(), argv[1].c_str());
-        return;
-    }
-
-    argv.erase(argv.begin());
-    command->second->printHelp(output, mainCommandName + " " + subCommandName, argv);
 }
 
 }

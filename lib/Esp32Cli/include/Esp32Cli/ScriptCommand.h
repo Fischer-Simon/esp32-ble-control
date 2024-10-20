@@ -27,32 +27,42 @@
 namespace Esp32Cli {
 class Cli;
 
-class ScriptCommand : public Command, public Client {
+class ScriptCommand : public Command {
 public:
-    explicit ScriptCommand(std::shared_ptr<Cli> cli) : Client{std::move(cli)} {}
+    explicit ScriptCommand(std::shared_ptr<Cli> cli) : m_cli{std::move(cli)} {}
 
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) override;
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override;
 
     void printUsage(Print& output) const override;
 
     void printHelp(Print& output, const std::string& commandName, std::vector<std::string>& argv) const override;
 
-    size_t write(const uint8_t* buffer, size_t size) override;
-
-    size_t write(uint8_t) override;
-
-    int available() override;
-
-    size_t readBytes(char* buffer, size_t length) override;
-
-    int read() override;
-
-    int peek() override;
-
 private:
-    size_t m_bytesLeft{0};
-    FILE* m_input{nullptr};
-    Stream* m_output{nullptr};
+    class ScriptClient : public Client {
+    public:
+        ScriptClient(std::shared_ptr<Cli> cli, const char* fileName, Stream* output);
+
+        size_t write(const uint8_t* buffer, size_t size) override;
+
+        size_t write(uint8_t) override;
+
+        int available() override;
+
+        size_t readBytes(char* buffer, size_t length) override;
+
+        int read() override;
+
+        int peek() override;
+
+        ~ScriptClient() override;
+
+    private:
+        size_t m_bytesLeft{0};
+        FILE* m_input{nullptr};
+        Stream* m_output{nullptr};
+    };
+
+    std::shared_ptr<Cli> m_cli;
 };
 }
 

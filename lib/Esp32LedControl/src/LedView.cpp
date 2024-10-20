@@ -20,13 +20,13 @@
 
 #include <LedManager.h>
 
-void MappedLedView::addAnimation(AnimationConfig config) {
-    config.affectedLedViews.emplace_back(shared_from_this());
-    config.targetBrightness *= getBrightness();
-    if (config.leds.empty()) {
-        config.leds = m_ledMap;
+void MappedLedView::addAnimation(std::unique_ptr<AnimationConfig> config) {
+    config->affectedLedViews.emplace_back(shared_from_this());
+    config->targetBrightness *= getBrightness();
+    if (config->leds.empty()) {
+        config->leds = m_ledMap;
     } else {
-        for (Led::Led::index_t& i : config.leds) {
+        for (Led::Led::index_t& i : config->leds) {
             if (i >= m_ledMap.size()) {
                 i = Led::Led::InvalidIndex;
                 continue;
@@ -37,10 +37,10 @@ void MappedLedView::addAnimation(AnimationConfig config) {
     m_parent->addAnimation(std::move(config));
 }
 
-void MirroredLedView::addAnimation(AnimationConfig config) {
-    config.affectedLedViews.emplace_back(shared_from_this());
+void MirroredLedView::addAnimation(std::unique_ptr<AnimationConfig> config) {
+    config->affectedLedViews.emplace_back(shared_from_this());
     for (size_t i = 0; i < m_parents.size() - 1; i++) {
-        m_parents[i]->addAnimation(config);
+        m_parents[i]->addAnimation(std::unique_ptr<AnimationConfig>(new AnimationConfig(*config)));
     }
     m_parents.back()->addAnimation(std::move(config));
 }

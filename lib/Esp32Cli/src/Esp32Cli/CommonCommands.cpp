@@ -36,11 +36,11 @@
 #define ARRAY_SIZE_OFFSET   5   //Increase this if print_real_time_stats returns ESP_ERR_INVALID_SIZE
 
 namespace Esp32Cli {
-void HostnameCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) {
+void HostnameCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const {
     io.println(m_cli.getHostname().c_str());
 }
 
-void MemCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) {
+void MemCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const {
     multi_heap_info_t info{};
     heap_caps_get_info(&info, MALLOC_CAP_DEFAULT);
 
@@ -56,7 +56,7 @@ void resetTimerFn(void*) {
     ESP.restart();
 }
 
-void ResetCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) {
+void ResetCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const {
     int delayMs = 200;
     if (argv.size() == 2) {
         delayMs = strtol(argv[1].c_str(), nullptr, 0);
@@ -82,7 +82,7 @@ namespace FsCommands {
 
 class TouchCommand : public Command {
 public:
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& args) override {
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& args) const override {
         if (args.size() != 2) {
             Cli::printUsage(io, commandName, *this);
             return;
@@ -98,7 +98,7 @@ public:
 
 class CatCommand : public Command {
 public:
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& args) override {
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& args) const override {
         if (args.size() != 2) {
             Cli::printUsage(io, commandName, *this);
             return;
@@ -123,7 +123,7 @@ public:
 
 class WriteCommand : public Command {
 public:
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& args) override {
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& args) const override {
         if (args.size() != 3) {
             Cli::printUsage(io, commandName, *this);
             return;
@@ -165,7 +165,7 @@ public:
 
 class LsCommand : public Command {
 public:
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& args) override {
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& args) const override {
         if (args.size() != 2) {
             Cli::printUsage(io, commandName, *this);
             return;
@@ -208,11 +208,11 @@ public:
 }
 
 FsCommand::FsCommand() {
-    addSubCommand<FsCommands::TouchCommand>("touch");
-    addSubCommand<FsCommands::CatCommand>("cat");
-    addSubCommand<FsCommands::WriteCommand>("write");
-    addSubCommand<FsCommands::LsCommand>("ls");
-    // addSubCommand<FsCommands::DfCommand>("df");
+    addCommand<FsCommands::TouchCommand>("touch");
+    addCommand<FsCommands::CatCommand>("cat");
+    addCommand<FsCommands::WriteCommand>("write");
+    addCommand<FsCommands::LsCommand>("ls");
+    // addCommand<FsCommands::DfCommand>("df");
 }
 #endif
 }

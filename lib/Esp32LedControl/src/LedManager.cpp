@@ -64,19 +64,15 @@ HsbColor HslToHsb(const HslColor& hsl) {
 }
 
 std::shared_ptr<LedView> LedManager::getLedViewByName(const std::string& name) {
-    auto it = m_ledViews.find(name);
-    if (it == m_ledViews.end()) {
-        return nullptr;
-    }
-    return it->second;
+    return m_ledViews.get(name.c_str());
 }
 
-void LedManager::addLedView(std::string name, std::shared_ptr<LedView> ledView) {
-    if (m_ledViews.find(name) != m_ledViews.end()) {
+void LedManager::addLedView(const std::string& name, std::shared_ptr<LedView> ledView) {
+    if (m_ledViews.get(name.c_str()) != nullptr) {
         log_e("LedView '%s' already exists", name.c_str());
         return;
     }
-    m_ledViews.emplace(std::move(name), std::move(ledView));
+    m_ledViews.set(name.c_str(), std::move(ledView));
 }
 
 HslColor LedManager::parseColor(const std::string& colorString, const std::shared_ptr<LedView>& ledView) const {
@@ -130,7 +126,7 @@ HslColor LedManager::parseColor(const std::string& colorString, const std::share
         }
         baseColor = ledView->getPrimaryColor();
     } else {
-        auto it = m_namedColors.find(colorType);
+        auto it = m_namedColors.find(colorType.c_str());
         if (it == m_namedColors.end()) {
             return {0, 0, 0};
         }
@@ -141,6 +137,6 @@ HslColor LedManager::parseColor(const std::string& colorString, const std::share
     return {baseColor.H, baseColor.S, baseColor.L * v};
 }
 
-void LedManager::addConfigErrorView(std::string name, const std::string& configKey, const std::string& error) {
-    m_ledViews.emplace(std::move(name), std::make_shared<InvalidLedView>("Missing or invalid config '" + configKey + "'" + (error.empty() ? "" : (": " + error))));
+void LedManager::addConfigErrorView(const std::string& name, const std::string& configKey, const std::string& error) {
+    addLedView(name, std::make_shared<InvalidLedView>("Missing or invalid config '" + configKey + "'" + (error.empty() ? "" : (": " + error))));
 }

@@ -22,39 +22,17 @@
 #include <memory>
 
 #include "Command.h"
+#include "CommandContainer.h"
 
 namespace Esp32Cli {
 
-class CommandGroup : public Command {
+class CommandGroup : public Command, protected CommandContainer {
 public:
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) override {
-        executeSubCommands(io, commandName, argv);
-    }
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override;
 
-    void printUsage(Print& output) const override {
-        printSubCommandUsage(output);
-    }
+    void printUsage(Print& output) const override;
 
     void printHelp(Print& output, const std::string& commandName, std::vector<std::string>& argv) const override;
-
-protected:
-    template<
-        typename CommandT,
-        typename... Args
-    >
-    void addSubCommand(std::string name, Args&&... args) {
-        addSubCommand(std::move(name), std::make_shared<CommandT>(std::forward<Args>(args)...));
-    }
-
-    void addSubCommand(std::string name, std::shared_ptr<Command> command);
-
-    void executeSubCommands(Stream& io, const std::string& commandName, std::vector<std::string>& argv);
-
-    void printSubCommandUsage(Print& output) const;
-
-    void printSubCommandHelp(Print& output, const std::string& commandName, std::vector<std::string>& argv) const;
-
-    std::map<std::string, std::shared_ptr<Command>> m_subCommands;
 };
 
 }

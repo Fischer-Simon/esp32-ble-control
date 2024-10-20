@@ -51,7 +51,7 @@ public:
         return {0, 0, 0};
     }
 
-    void addAnimation(AnimationConfig) override;
+    void addAnimation(std::unique_ptr<AnimationConfig> config) override;
 
     void update();
 

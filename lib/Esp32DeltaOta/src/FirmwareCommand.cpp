@@ -120,7 +120,7 @@ class InfoCommand : public Esp32Cli::Command {
 public:
     explicit InfoCommand(Esp32DeltaOta& ota) : m_ota{ota} {}
 
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) override {
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override {
         auto partition = esp_ota_get_running_partition();
         esp_partition_pos_t partitionPosition = {partition->address, partition->size};
         esp_image_metadata_t imageMetadata;
@@ -148,7 +148,7 @@ private:
 
 class EraseNextCommand : public Esp32Cli::Command {
 public:
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) override {
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override {
         if (argv.size() != 2) {
             Esp32Cli::Cli::printUsage(io, commandName, *this);;
             return;
@@ -180,7 +180,7 @@ class FlashDeltaCommand : public Esp32Cli::Command {
 public:
     explicit FlashDeltaCommand(Esp32DeltaOta& ota) : m_ota{ota} {}
 
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) override {
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override {
         if (argv.size() != 5) {
             Esp32Cli::Cli::printUsage(io, commandName, *this);;
             return;
@@ -256,7 +256,7 @@ class FlashDataCommand : public Esp32Cli::Command {
 public:
     explicit FlashDataCommand(Esp32DeltaOta& ota) : m_ota{ota} {}
 
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) override {
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override {
         if (argv.size() != 3) {
             Esp32Cli::Cli::printUsage(io, commandName, *this);;
             return;
@@ -350,7 +350,7 @@ private:
 
 class DumpCommand : public Esp32Cli::Command {
 public:
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) override {
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override {
         auto partition = esp_ota_get_boot_partition();
         esp_partition_pos_t partitionPosition = {partition->address, partition->size};
         esp_image_metadata_t imageMetadata;
@@ -422,7 +422,7 @@ class SelfTestCommand : public Esp32Cli::Command {
 public:
     explicit SelfTestCommand(Esp32DeltaOta& ota) : m_ota{ota} {}
 
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) override {
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override {
         delay(1000); // Just a basic test to see if the Firmware even survives a second of runtime.
         if (ESP.getFreeHeap() < 40000) {
             io.println(R"({"error": "Recovery has too little free heap"})");
@@ -444,7 +444,7 @@ class RequestRecoveryCommand : public Esp32Cli::Command {
 public:
     explicit RequestRecoveryCommand(Esp32DeltaOta& ota) : m_ota{ota} {}
 
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) override {
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override {
         m_ota.requestRecovery();
     }
 
@@ -457,13 +457,13 @@ private:
 };
 
 FirmwareCommand::FirmwareCommand(Esp32DeltaOta& ota, bool doingRecoveryTest) {
-    addSubCommand<InfoCommand>("info", ota);
-    addSubCommand<DumpCommand>("dump");
-    addSubCommand<FlashDeltaCommand>("flash-delta", ota);
-    addSubCommand<FlashDataCommand>("flash-data", ota);
-    addSubCommand<RequestRecoveryCommand>("request-recovery", ota);
+    addCommand<InfoCommand>("info", ota);
+    addCommand<DumpCommand>("dump");
+    addCommand<FlashDeltaCommand>("flash-delta", ota);
+    addCommand<FlashDataCommand>("flash-data", ota);
+    addCommand<RequestRecoveryCommand>("request-recovery", ota);
     if (doingRecoveryTest) {
-        addSubCommand<SelfTestCommand>("self-test", ota);
+        addCommand<SelfTestCommand>("self-test", ota);
     }
 }
 };

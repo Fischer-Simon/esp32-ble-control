@@ -45,7 +45,7 @@ void LedManager::loadColorsFromConfig(const std::string& namedColorPath) {
     std::ifstream file{namedColorPath};
     deserializeJson(json, file);
     for (const auto& color : json.as<JsonObjectConst>()) {
-        m_namedColors.emplace(color.key().c_str(), parseColor(color.value()));
+        m_namedColors.set(color.key().c_str(), parseColor(color.value()));
     }
 }
 
@@ -124,6 +124,6 @@ void LedManager::loadLedsFromConfig(const std::string& ledPath, const std::funct
             ledView = std::make_shared<InvalidLedView>("Unknown type '" + std::string{type.c_str()} + "'");
         }
         ledView->setOnCurrentAnimationTargetColorChanged(onAnimationColorChange);
-        m_ledViews.emplace(name, ledView);
+        addLedView(name, ledView);
     }
 }

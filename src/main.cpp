@@ -44,7 +44,7 @@ std::shared_ptr<Preferences> preferences;
 std::shared_ptr<ArduinoMultiWiFi> wifiManager;
 #endif
 std::shared_ptr<Esp32BleUi> bleUi;
-std::shared_ptr<Esp32Cli::Cli> espCli;
+std::shared_ptr<Esp32Cli::Cli> cli;
 std::shared_ptr<Esp32DeltaOta> ota;
 std::shared_ptr<Lua> lua;
 std::shared_ptr<LedManager> ledManager;
@@ -55,7 +55,7 @@ std::shared_ptr<Esp32Cli::TelnetServer> telnetServer;
 
 class TestDataCommand : public Esp32Cli::Command {
 public:
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) override {
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override {
         static const char* buf = "12345678";
         io.println("Test 13");
 
@@ -79,7 +79,7 @@ public:
 
 class TestUploadCommand : public Esp32Cli::Command {
 public:
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) override {
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override {
         if (argv.size() != 5) {
             return;
         }
@@ -111,13 +111,14 @@ public:
 
 class CrashCommand : public Esp32Cli::Command {
 public:
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) override {
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override {
         *reinterpret_cast<int*>(0) = 42;
     }
 };
 
 [[noreturn]] void recoveryMode() {
-    espCli->setFirmwareInfo("RECOVERY MODE");
+    Serial.println("RECOVERY MODE");
+    cli->setFirmwareInfo("RECOVERY MODE");
     while (true) {
         delay(1000);
     }
@@ -125,7 +126,7 @@ public:
 
 class PwmCommand : public Esp32Cli::Command {
 public:
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) override {
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override {
         if (argv.size() != 2) {
             Esp32Cli::Cli::printUsage(io, commandName, *this);
             return;
@@ -155,24 +156,25 @@ bool operator!=(const HslColor& a, const HslColor& b) {
     return a.H != b.H || a.S != b.S || a.L != b.L;
 }
 
-template <typename... Types>
+template<typename... Types>
 class Metrics : public Esp32BleMetrics {
 public:
     template<typename T>
     static inline constexpr auto
     typeIndex() -> uint8_t { return TypeIndex<0, T, Types...>::value; }
 
-    template <typename T>
+    template<typename T>
     void setValue(const char* metricNamespace, const char* objectName, const char* metricName, T value) {
         constexpr uint8_t type = typeIndex<T>();
         auto lock = std::unique_lock<std::mutex>(m_mutex);
         auto& metricValues = std::get<type>(m_metricValues);
-        std::string name = std::string{metricNamespace} + "/" + objectName + "/" + metricName;
+        std::string nameStr = std::string{metricNamespace} + "/" + objectName + "/" + metricName;
+        const char* name = nameStr.c_str();
         auto it = metricValues.find(name);
         bool changed;
         if (it == metricValues.end()) {
-            auto res = metricValues.emplace(name, value);
-            it = res.first;
+            metricValues.set(name, value);
+            it = metricValues.find(name);
             changed = true;
         } else {
             auto& currentValue = it->second;
@@ -180,23 +182,23 @@ public:
             currentValue = value;
         }
 
-        if (!changed || !m_metricsTask || m_changedMetricsBuffer.free() < (name.size() + 1 + sizeof(type) + sizeof(value))) {
+        if (!changed || !m_metricsTask ||
+            m_changedMetricsBuffer.free() < (nameStr.size() + 1 + sizeof(type) + sizeof(value))) {
             return;
         }
-        m_changedMetricsBuffer.push(reinterpret_cast<const uint8_t*>(name.c_str()), name.size() + 1);
-        m_changedMetricsBuffer.push(reinterpret_cast<const uint8_t*>(&type), sizeof(type));
+        m_changedMetricsBuffer.push(reinterpret_cast<const uint8_t*>(name), nameStr.size() + 1);
+        m_changedMetricsBuffer.push(&type, sizeof(type));
         m_changedMetricsBuffer.push(reinterpret_cast<const uint8_t*>(&it->second), sizeof(value));
         notifyTask();
     }
 
 private:
-    std::tuple<std::map<std::string, Types>...> m_metricValues;
+    std::tuple<LightweightMap<Types>...> m_metricValues;
 };
 
 using MyMetrics = Metrics<int, float, HslColor>;
 
 std::shared_ptr<MyMetrics> metrics;
-
 
 void updateLedMetrics(const LedView& ledView) {
     metrics->setValue("led", ledView.getName().c_str(), "color", ledView.getAnimationTargetColor());
@@ -223,7 +225,7 @@ void setup() {
         fclose(hostnameFile);
     }
 
-    espCli = Esp32Cli::Cli::create(WiFiClass::getHostname());
+    cli = Esp32Cli::Cli::create(WiFiClass::getHostname());
 
 #if ESP32_BLE_CONTROL_ENABLE_WIFI
     wifiManager = std::make_shared<ArduinoMultiWiFi>(
@@ -232,8 +234,8 @@ void setup() {
     telnetServer = std::make_shared<Esp32Cli::TelnetServer>(espCli, 23);
 #endif
 
-    bleUi = std::make_shared<Esp32BleUi>(espCli);
-    ota = std::make_shared<Esp32DeltaOta>(espCli, preferences);
+    bleUi = std::make_shared<Esp32BleUi>(cli);
+    ota = std::make_shared<Esp32DeltaOta>(cli, preferences);
 
     if (ota->shouldStartRecoveryMode()) {
         recoveryMode();
@@ -243,20 +245,21 @@ void setup() {
     bleUi->setMetrics(metrics);
 
     ledManager = std::make_shared<LedManager>();
-    ledManager->loadColorsFromConfig("/data/colors.json");
-    ledManager->loadLedsFromConfig("/data/leds.json", &updateLedMetrics);
-    espCli->addCommand<CliCommand::LedCommandGroup>("led", ledManager);
+    ledManager->loadColorsFromConfig("/data/etc/colors.json");
+    ledManager->loadLedsFromConfig("/data/etc/leds.json", &updateLedMetrics);
+    cli->addCommand<CliCommand::LedCommandGroup>("led", ledManager);
 
     lua = std::make_shared<Lua>();
-    espCli->addCommand<CliCommand::LuaCommandGroup>("lua", lua);
+    cli->addCommand<CliCommand::LuaCommandGroup>("lua", lua);
 
     ledcSetup(0, 300000, 7);
     ledcAttachPin(2, 0);
-    espCli->addCommand<PwmCommand>("pwm");
+    cli->addCommand<PwmCommand>("pwm");
 
-    espCli->addCommand<TestDataCommand>("test-data");
-    espCli->addCommand<TestUploadCommand>("test-upload");
-    espCli->addCommand<CrashCommand>("crash");
+    cli->addCommand<TestDataCommand>("test-data");
+    cli->addCommand<TestUploadCommand>("test-upload");
+    cli->addCommand<CrashCommand>("crash");
+
 
     vTaskDelete(nullptr);
 }

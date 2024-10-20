@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "Esp32Cli/Command.h"
+#include "Esp32Cli/CommandContainer.h"
 
 #include <Arduino.h>
 #include <map>
@@ -27,8 +27,10 @@
 #include <memory>
 
 namespace Esp32Cli {
-class Cli : public std::enable_shared_from_this<Cli> {
-    struct Private{ explicit Private() = default; };
+class Cli : public CommandContainer, public std::enable_shared_from_this<Cli> {
+    struct Private {
+        explicit Private() = default;
+    };
 
 public:
     explicit Cli(std::string hostname, Private);
@@ -36,16 +38,6 @@ public:
     static std::shared_ptr<Cli> create(std::string hostname);
 
     void setFirmwareInfo(std::string firmwareInfo);
-
-    template<
-        typename CommandT,
-        typename... Args
-    >
-    void addCommand(std::string name, Args&&... args) {
-        addCommand(std::move(name), std::make_shared<CommandT>(std::forward<Args>(args)...));
-    }
-
-    void addCommand(std::string name, std::shared_ptr<Command> command);
 
     void executeCommand(Stream& io, std::vector<std::string>& argv) const;
 
@@ -67,7 +59,7 @@ private:
         explicit HelpCommand(Cli& cli) : m_cli{cli} {
         }
 
-        void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) override;
+        void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override;
 
     private:
         Cli& m_cli;
@@ -75,6 +67,5 @@ private:
 
     std::string m_hostname;
     std::string m_firmwareInfo{};
-    std::map<std::string, std::shared_ptr<Command> > m_commands{};
 };
 }
