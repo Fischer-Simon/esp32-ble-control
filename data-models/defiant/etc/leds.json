@@ -1,0 +1,131 @@
+{
+  "Engine Left": {
+    "type": "NeoPixelRgbw",
+    "pixelCount": 14,
+    "pin": 19,
+    "rmtChannel": 0,
+    "position": [-7, -5, 13],
+    "ledPositions": {
+      "0-6": {
+        "start": [0, 0, 0],
+        "offset": [0, 0, 0]
+      },
+      "7-13": {
+        "start": [-1, 6, 0],
+        "offset": [0, 0, 0]
+      }
+    }
+  },
+  "Bussard Left": {
+    "type": "MapView",
+    "parent": "Engine Left",
+    "defaultBrightness": 0.5,
+    "primaryColor": "red",
+    "ledMap": ["7-13"]
+  },
+  "Warp Left": {
+    "type": "MapView",
+    "parent": "Engine Left",
+    "defaultBrightness": 0.5,
+    "primaryColor": "blue",
+    "ledMap": ["0-6"]
+  },
+  "Engine Right": {
+    "type": "NeoPixelRgbw",
+    "pixelCount": 14,
+    "pin": 18,
+    "rmtChannel": 1,
+    "position": [7, -5, 13],
+    "ledPositions": {
+      "0-6": {
+        "start": [0, 0, 0],
+        "offset": [0, 0, 0]
+      },
+      "7-13": {
+        "start": [1, 6, 0],
+        "offset": [0, 0, 0]
+      }
+    }
+  },
+  "Bussard Right": {
+    "type": "MapView",
+    "parent": "Engine Right",
+    "defaultBrightness": 0.5,
+    "primaryColor": "red",
+    "ledMap": ["7-13"]
+  },
+  "Warp Right": {
+    "type": "MapView",
+    "parent": "Engine Right",
+    "defaultBrightness": 0.5,
+    "primaryColor": "blue",
+    "ledMap": ["0-6"]
+  },
+  "Impulse Left": {
+    "type": "NeoPixelRgbw",
+    "pixelCount": 1,
+    "pin": 15,
+    "rmtChannel": 2,
+    "primaryColor": "red",
+    "position": [-5, -9, 13],
+    "ledPositions": {
+      "0": [0, 0, 0]
+    }
+  },
+  "Impulse Right": {
+    "type": "NeoPixelRgbw",
+    "pixelCount": 1,
+    "pin": 2,
+    "rmtChannel": 3,
+    "primaryColor": "red",
+    "position": [5, -9, 13],
+    "ledPositions": {
+      "0": [0, 0, 0]
+    }
+  },
+  "Bussard": {
+    "type": "MirrorView",
+    "parents": [
+      "Bussard Left",
+      "Bussard Right"
+    ]
+  },
+  "Warp": {
+    "type": "MirrorView",
+    "parents": [
+      "Warp Left",
+      "Warp Right"
+    ]
+  },
+  "Impulse": {
+    "type": "MirrorView",
+    "parents": [
+      "Impulse Left",
+      "Impulse Right"
+    ]
+  },
+  "Deflector": {
+    "type": "NeoPixelRgbw",
+    "pixelCount": 3,
+    "pin": 13,
+    "rmtChannel": 4,
+    "primaryColor": "blue",
+    "defaultBrightness": 0.5,
+    "position": [1, 13, 12],
+    "ledPositions": {
+      "0-2": {
+        "start": [0, 0, 0],
+        "offset": [-1, 0, 0]
+      }
+    }
+  },
+  "All": {
+    "type": "CombinedView",
+    "parents": [
+      "Impulse",
+      "Warp",
+      "Bussard",
+      "Deflector"
+    ]
+  }
+}

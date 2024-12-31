@@ -1,20 +1,22 @@
 [
   {
     "name": "mirror_leds",
-    "type": "led_control",
+    "type": "LedControl",
     "config": {
-      "ledName": "Mirror"
+      "ledName": "Mirror",
+      "icon": "/data/share/led.png"
     },
     "children": [
       {
         "name": "flash_grp",
-        "type": "flex_group",
+        "type": "FlexGroup",
         "children": [
           {
             "name": "flash_brightness",
-            "type": "slider",
+            "type": "Slider",
             "style": {
-              "flex": "30%"
+              "flex": "30%",
+              "minWidth": "300px"
             },
             "config": {
               "label": "Flash brightness",
@@ -26,9 +28,10 @@
           },
           {
             "name": "flash_speed",
-            "type": "slider",
+            "type": "Slider",
             "style": {
-              "flex": "30%"
+              "flex": "30%",
+              "minWidth": "300px"
             },
             "config": {
               "label": "Flash speed",
@@ -39,31 +42,32 @@
           },
           {
             "name": "flash_btn",
-            "type": "button",
+            "type": "Button",
             "config": {
               "label": "Flash",
-              "onClick": "led animate mirror 0 {flash_speed} 300 rgb(0,{flash_brightness},0) 2 blend easeInOutSine"
+              "onClick": "led animate Mirror 0 {flash_speed} 800 rgb(0,{flash_brightness},0) 2 addManual easeInOutSine"
             }
           },
           {
             "name": "flash_rev_btn",
-            "type": "button",
+            "type": "Button",
             "config": {
               "label": "Flash Reverse",
-              "onClick": "led animate mirror 0 -{flash_speed} 300 rgb({flash_brightness},0,0) 2 blend easeInOutSine"
+              "onClick": "led animate Mirror 0 {flash_speed} 800 rgb({flash_brightness},0,0) -2 addManual easeInOutSine"
             }
           }
         ]
       },
       {
         "name": "leds_grp",
-        "type": "flex_group",
+        "type": "FlexGroup",
         "children": [
           {
             "name": "map_1_leds",
-            "type": "led_control",
+            "type": "LedControl",
             "style": {
-              "flex": "1"
+              "flex": "1",
+              "minWidth": "250px"
             },
             "config": {
               "ledName": "Map 1"
@@ -71,9 +75,10 @@
           },
           {
             "name": "map_2_leds",
-            "type": "led_control",
+            "type": "LedControl",
             "style": {
-              "flex": "1"
+              "flex": "1",
+              "minWidth": "250px"
             },
             "config": {
               "ledName": "Map 2"
@@ -84,8 +89,15 @@
     ]
   },
   {
+    "name": "tail_leds",
+    "type": "LedControl",
+    "config": {
+      "ledName": "Map 3"
+    }
+  },
+  {
     "name": "reset_btn",
-    "type": "button",
+    "type": "Button",
     "config": {
       "label": "Reset",
       "onClick": "reset"
@@ -93,7 +105,7 @@
   },
   {
     "name": "pwm_test",
-    "type": "slider",
+    "type": "Slider",
     "config": {
       "label": "PWM",
       "minValue": 0,
@@ -103,7 +115,7 @@
   },
   {
     "name": "led_test",
-    "type": "slider",
+    "type": "Slider",
     "config": {
       "label": "Green",
       "minValue": 0,

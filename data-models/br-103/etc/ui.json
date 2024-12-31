@@ -1,0 +1,23 @@
+[
+  {
+    "name": "animations_grp",
+    "type": "FlexGroup",
+    "config": {
+      "title": "Animations"
+    },
+    "children": [
+      {
+        "name": "light_wave",
+        "type": "Button",
+        "config": {
+          "label": "Light Wave",
+          "onClick": "js run 'import {lightWave} from \"/data/lib/animation.js\"; lightWave(10);'"
+        }
+      }
+    ]
+  },
+  {
+    "name": "motor",
+    "type": "MotorControl"
+  }
+]

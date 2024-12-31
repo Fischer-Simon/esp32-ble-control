@@ -1,0 +1,91 @@
+{
+  "Engine Right": {
+    "type": "NeoPixelApa104",
+    "pixelCount": 9,
+    "pin": 6,
+    "rmtChannel": 0,
+    "position": [5, -7, 0],
+    "ledPositions": {
+      "0-8": {
+        "start": [0, 0, 11],
+        "offset": [0, 0.5, 0]
+      }
+    }
+  },
+  "Bussard Right": {
+    "type": "MapView",
+    "parent": "Engine Right",
+    "defaultBrightness": 0.4,
+    "primaryColor": "red",
+    "ledMap": [7, 8]
+  },
+  "Warp Right": {
+    "type": "MapView",
+    "parent": "Engine Right",
+    "defaultBrightness": 0.4,
+    "primaryColor": "blue",
+    "ledMap": ["6-0"]
+  },
+  "Engine Left": {
+    "type": "NeoPixelApa104",
+    "pixelCount": 9,
+    "pin": 5,
+    "rmtChannel": 1,
+    "position": [-5, -7, 11],
+    "ledPositions": {
+      "0-8": {
+        "start": [0, 0, 0],
+        "offset": [0, 0.5, 0]
+      }
+    }
+  },
+  "Bussard Left": {
+    "type": "MapView",
+    "parent": "Engine Left",
+    "defaultBrightness": 0.4,
+    "primaryColor": "red",
+    "ledMap": [7, 8]
+  },
+  "Warp Left": {
+    "type": "MapView",
+    "parent": "Engine Left",
+    "defaultBrightness": 0.4,
+    "primaryColor": "blue",
+    "ledMap": ["6-0"]
+  },
+  "Bussard": {
+    "type": "MirrorView",
+    "parents": [
+      "Bussard Left",
+      "Bussard Right"
+    ]
+  },
+  "Warp": {
+    "type": "MirrorView",
+    "parents": [
+      "Warp Left",
+      "Warp Right"
+    ]
+  },
+  "Deflector": {
+    "type": "NeoPixelApa104BitBang",
+    "pixelCount": 3,
+    "pin": 7,
+    "position": [0, 0, 0],
+    "primaryColor": "blue",
+    "ledPositions": {
+      "0-2": {
+        "start": [-1, 9, 9],
+        "offset": [-0.5, 0, 0]
+      }
+    }
+  },
+  "All": {
+    "type": "CombinedView",
+    "parents": [
+      "Warp",
+      "Bussard",
+      "Deflector"
+    ]
+  }
+}

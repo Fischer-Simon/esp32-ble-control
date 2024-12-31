@@ -1,9 +1,16 @@
 {
   "Test LEDs": {
-    "type": "NeoPixelRgb",
+    "type": "NeoPixelApa104",
     "pixelCount": 20,
     "pin": 1,
-    "rmtChannel": 0
+    "rmtChannel": 0,
+    "position": [0, 0, 0],
+    "ledPositions": {
+      "0-19": {
+        "start": [0, 0, 0],
+        "offset": [1, 0, 0]
+      }
+    }
   },
   "Map 1": {
     "type": "MapView",
@@ -28,6 +35,17 @@
   },
   "Mirror": {
     "type": "MirrorView",
-    "parents": ["Map 1", "Map 2"]
+    "parents": [
+      "Map 1",
+      "Map 2"
+    ]
+  },
+  "All": {
+    "type": "CombinedView",
+    "parents": [
+      "Map 1",
+      "Map 2",
+      "Map 3"
+    ]
   }
 }

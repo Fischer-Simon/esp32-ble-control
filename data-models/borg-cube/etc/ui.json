@@ -1,0 +1,114 @@
+[
+  {
+    "name": "animations_grp",
+    "type": "FlexGroup",
+    "config": {
+      "title": "Animations"
+    },
+    "children": [
+      {
+        "name": "energy_loss",
+        "type": "Button",
+        "config": {
+          "label": "Energy Loss",
+          "onClick": "js run 'import {energyLoss} from \"/data/bin/main.js\"; energyLoss()'"
+        }
+      },
+      {
+        "name": "energy_flash",
+        "type": "Button",
+        "config": {
+          "label": "Energy Flash",
+          "onClick": "js run 'import {energyFlash} from \"/data/bin/main.js\"; energyFlash()'"
+        }
+      },
+      {
+        "name": "light_wave",
+        "type": "Button",
+        "config": {
+          "label": "Light Wave",
+          "onClick": "js run 'import {lightWave} from \"/data/lib/animation.js\"; lightWave(15);'"
+        }
+      }
+    ]
+  },
+  {
+    "name": "cube_leds",
+    "type": "LedControl",
+    "config": {
+      "ledName": "Cube",
+      "icon": "/data/share/cube.png"
+    },
+    "children": [
+      {
+        "name": "leds_grp",
+        "type": "FlexGroup",
+        "children": [
+          {
+            "name": "left",
+            "type": "LedControl",
+            "style": {
+              "flex": "1",
+              "minWidth": "250px"
+            },
+            "config": {
+              "ledName": "Left"
+            }
+          },
+          {
+            "name": "right",
+            "type": "LedControl",
+            "style": {
+              "flex": "1",
+              "minWidth": "250px"
+            },
+            "config": {
+              "ledName": "Right"
+            }
+          },
+          {
+            "name": "front",
+            "type": "LedControl",
+            "style": {
+              "flex": "1",
+              "minWidth": "250px"
+            },
+            "config": {
+              "ledName": "Front"
+            }
+          },
+          {
+            "name": "back",
+            "type": "LedControl",
+            "style": {
+              "flex": "1",
+              "minWidth": "250px"
+            },
+            "config": {
+              "ledName": "Back"
+            }
+          },
+          {
+            "name": "top",
+            "type": "LedControl",
+            "style": {
+              "flex": "1",
+              "minWidth": "250px"
+            },
+            "config": {
+              "ledName": "Top"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "bottom",
+    "type": "LedControl",
+    "config": {
+      "ledName": "Bottom",
+      "icon": "/data/share/bottom.png"
+    }
+  }
+]

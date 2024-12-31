@@ -1,0 +1,20 @@
+[
+  {
+    "name": "hall_value",
+    "type": "MetricValue",
+    "config": {
+      "label": "Hall Value:",
+      "metricName": "Motor/Hall"
+    }
+  },
+  {
+    "name": "duty_cycle",
+    "type": "Slider",
+    "config": {
+      "label": "Duty Cycle",
+      "minValue": 0,
+      "maxValue": 100,
+      "onChange": "pwm {value}"
+    }
+  }
+]

@@ -1,0 +1,135 @@
+[
+  {
+    "name": "animations_grp",
+    "type": "FlexGroup",
+    "config": {
+      "title": "Animations"
+    },
+    "children": [
+      {
+        "name": "warp_charge",
+        "type": "Button",
+        "config": {
+          "label": "Warp Charge",
+          "onClick": "js run 'import {warpCharge} from \"/data/lib/animation.js\"; warpCharge()'"
+        }
+      },
+      {
+        "name": "warp_flash",
+        "type": "Button",
+        "config": {
+          "label": "Warp Flash",
+          "onClick": "js run 'import {warpFlash} from \"/data/lib/animation.js\"; warpFlash()'"
+        }
+      },
+      {
+        "name": "bussard_glow",
+        "type": "Button",
+        "config": {
+          "label": "Bussard Glow",
+          "onClick": "js run 'import {bussardGlow} from \"/data/lib/animation.js\"; bussardGlow()'"
+        }
+      },
+      {
+        "name": "deflector_rotate",
+        "type": "Button",
+        "config": {
+          "label": "Deflector Rotate",
+          "onClick": "js run 'import {deflectorRotate} from \"/data/lib/animation.js\"; deflectorRotate()'"
+        }
+      },
+      {
+        "name": "light_wave",
+        "type": "Button",
+        "config": {
+          "label": "Light Wave",
+          "onClick": "js run 'import {lightWave} from \"/data/lib/animation.js\"; lightWave(8);'"
+        }
+      }
+    ]
+  },
+  {
+    "name": "warp_leds",
+    "type": "LedControl",
+    "config": {
+      "ledName": "Warp",
+      "icon": "/data/share/warp.png"
+    },
+    "children": [
+      {
+        "name": "leds_grp",
+        "type": "FlexGroup",
+        "children": [
+          {
+            "name": "warp_left",
+            "type": "LedControl",
+            "style": {
+              "flex": "1",
+              "minWidth": "250px"
+            },
+            "config": {
+              "ledName": "Warp Left"
+            }
+          },
+          {
+            "name": "warp_right",
+            "type": "LedControl",
+            "style": {
+              "flex": "1",
+              "minWidth": "250px"
+            },
+            "config": {
+              "ledName": "Warp Right"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "bussard_leds",
+    "type": "LedControl",
+    "config": {
+      "ledName": "Bussard",
+      "icon": "/data/share/bussard.png"
+    },
+    "children": [
+      {
+        "name": "leds_grp",
+        "type": "FlexGroup",
+        "children": [
+          {
+            "name": "bussard_left",
+            "type": "LedControl",
+            "style": {
+              "flex": "1",
+              "minWidth": "250px"
+            },
+            "config": {
+              "ledName": "Bussard Left"
+            }
+          },
+          {
+            "name": "bussard_right",
+            "type": "LedControl",
+            "style": {
+              "flex": "1",
+              "minWidth": "250px"
+            },
+            "config": {
+              "ledName": "Bussard Right"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "deflector_leds",
+    "type": "LedControl",
+    "config": {
+      "ledName": "Deflector",
+      "icon": "/data/share/deflector.png"
+    }
+  }
+]
