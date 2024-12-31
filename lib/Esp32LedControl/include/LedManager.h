@@ -21,30 +21,62 @@
 #include "LedString.h"
 #include "LedView.h"
 
-#include <functional>
-#include <map>
-#include <memory>
+#include <Js.h>
+#include <KeyValueStore.h>
 #include <LightweightMap.h>
+#include <memory>
+#include <Esp32Cli/Client.h>
+#include <Led/ColorManager.h>
 
 class LedManager {
 public:
+    explicit LedManager(std::shared_ptr<KeyValueStore> keyValueStore, std::shared_ptr<Led::ColorManager> colorManager, const std::shared_ptr<Js>& js);
+
     std::shared_ptr<LedView> getLedViewByName(const std::string& name);
 
-    const std::vector<LightweightMap<std::shared_ptr<LedView>>::entry_t>& getLedViews() const {
+    const std::vector<LightweightMap<std::shared_ptr<LedView> >::entry_t>& getLedViews() const {
         return m_ledViews.getEntries();
     }
 
     void addLedView(const std::string& name, std::shared_ptr<LedView> ledView);
 
-    void loadColorsFromConfig(const std::string& namedColorPath);
+    void loadLedsFromConfig(const std::string& ledPath);
 
-    void loadLedsFromConfig(const std::string& ledPath, const std::function<void(const LedView&)>& onAnimationColorChange = nullptr);
+    const ModelLocation& getModelLocation() const {
+        return m_modelLocation->value();
+    }
 
-    HslColor parseColor(const std::string& colorString, const std::shared_ptr<LedView>& ledView = nullptr) const;
+    void setModelLocation(const ModelLocation& modelLocation) const {
+        m_modelLocation->setValue(modelLocation);
+    }
+
+    void stopAllAnimations() const;
+
+    void setManualMode(bool enable, bool save = false) const;
+
+    bool isManualMode() const {
+        return m_manualMode->value();
+    }
+
+    void setStartupAnimationEnabled(bool enable) const {
+        m_startupAnimationEnabled->setValue(enable);
+    }
+
+    bool isStartupAnimationEnabled() const {
+        return m_startupAnimationEnabled->value();
+    }
 
 private:
     void addConfigErrorView(const std::string& name, const std::string& configKey, const std::string& error = "");
 
-    LightweightMap<HslColor> m_namedColors;
-    LightweightMap<std::shared_ptr<LedView>> m_ledViews;
+    mutable std::mutex m_mutex;
+    std::shared_ptr<KeyValueStore> m_keyValueStore;
+    std::shared_ptr<KeyValueStore::SimpleValue<ModelLocation>> m_modelLocation;
+    std::shared_ptr<KeyValueStore::SimpleValue<bool>> m_manualModeOnStartup;
+    std::shared_ptr<KeyValueStore::SimpleValue<bool>> m_manualMode;
+    std::shared_ptr<KeyValueStore::SimpleValue<bool>> m_startupAnimationEnabled;
+    std::shared_ptr<Led::ColorManager> m_colorManager;
+    std::vector<std::shared_ptr<LedString> > m_ledStrings;
+    LightweightMap<std::shared_ptr<LedView> > m_ledViews;
+    std::shared_ptr<Js> m_js;
 };

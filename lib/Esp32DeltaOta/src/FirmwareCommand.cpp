@@ -120,7 +120,7 @@ class InfoCommand : public Esp32Cli::Command {
 public:
     explicit InfoCommand(Esp32DeltaOta& ota) : m_ota{ota} {}
 
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override {
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv, const std::shared_ptr<Esp32Cli::Client>& client) const override {
         auto partition = esp_ota_get_running_partition();
         esp_partition_pos_t partitionPosition = {partition->address, partition->size};
         esp_image_metadata_t imageMetadata;
@@ -148,7 +148,7 @@ private:
 
 class EraseNextCommand : public Esp32Cli::Command {
 public:
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override {
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv, const std::shared_ptr<Esp32Cli::Client>& client) const override {
         if (argv.size() != 2) {
             Esp32Cli::Cli::printUsage(io, commandName, *this);;
             return;
@@ -180,7 +180,7 @@ class FlashDeltaCommand : public Esp32Cli::Command {
 public:
     explicit FlashDeltaCommand(Esp32DeltaOta& ota) : m_ota{ota} {}
 
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override {
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv, const std::shared_ptr<Esp32Cli::Client>& client) const override {
         if (argv.size() != 5) {
             Esp32Cli::Cli::printUsage(io, commandName, *this);;
             return;
@@ -208,10 +208,12 @@ public:
         otaState.compressedPatchSizeLeft = compressedPatchSize;
         otaState.patchSize = patchSize;
 
+        Serial.println("esp_ota_begin");
         if (esp_ota_begin(otaState.destPartition, imageSize, &(otaState.otaHandle)) != ESP_OK) {
             io.println(R"({"error": "esp_ota_begin failed"})");
             return;
         }
+        Serial.println("esp_ota_begin done");
 
         bspatch_stream_i inputStream{&otaState, readSrc};
         bspatch_stream_n outputStream{&otaState, writeDest};
@@ -256,7 +258,7 @@ class FlashDataCommand : public Esp32Cli::Command {
 public:
     explicit FlashDataCommand(Esp32DeltaOta& ota) : m_ota{ota} {}
 
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override {
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv, const std::shared_ptr<Esp32Cli::Client>& client) const override {
         if (argv.size() != 3) {
             Esp32Cli::Cli::printUsage(io, commandName, *this);;
             return;
@@ -350,7 +352,7 @@ private:
 
 class DumpCommand : public Esp32Cli::Command {
 public:
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override {
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv, const std::shared_ptr<Esp32Cli::Client>& client) const override {
         auto partition = esp_ota_get_boot_partition();
         esp_partition_pos_t partitionPosition = {partition->address, partition->size};
         esp_image_metadata_t imageMetadata;
@@ -422,7 +424,7 @@ class SelfTestCommand : public Esp32Cli::Command {
 public:
     explicit SelfTestCommand(Esp32DeltaOta& ota) : m_ota{ota} {}
 
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override {
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv, const std::shared_ptr<Esp32Cli::Client>& client) const override {
         delay(1000); // Just a basic test to see if the Firmware even survives a second of runtime.
         if (ESP.getFreeHeap() < 40000) {
             io.println(R"({"error": "Recovery has too little free heap"})");
@@ -444,7 +446,7 @@ class RequestRecoveryCommand : public Esp32Cli::Command {
 public:
     explicit RequestRecoveryCommand(Esp32DeltaOta& ota) : m_ota{ota} {}
 
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override {
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv, const std::shared_ptr<Esp32Cli::Client>& client) const override {
         m_ota.requestRecovery();
     }
 

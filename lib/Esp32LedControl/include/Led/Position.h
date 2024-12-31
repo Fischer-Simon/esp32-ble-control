@@ -34,6 +34,22 @@ struct Position {
         return std::sqrt(dx * dx + dy * dy + dz * dz);
     }
 
+    float distance(float x2, float y2, float z2) const {
+        auto dx = static_cast<float>(x) - x2;
+        auto dy = static_cast<float>(y) - y2;
+        auto dz = static_cast<float>(z) - z2;
+
+        return std::sqrt(dx * dx + dy * dy + dz * dz);
+    }
+
+    float distance(const Position& offset, float x2, float y2, float z2) const {
+        auto dx = static_cast<float>(x - offset.x) - x2;
+        auto dy = static_cast<float>(y - offset.y) - y2;
+        auto dz = static_cast<float>(z - offset.z) - z2;
+
+        return std::sqrt(dx * dx + dy * dy + dz * dz);
+    }
+
     int8_t x;
     int8_t y;
     int8_t z;

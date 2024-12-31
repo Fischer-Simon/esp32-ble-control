@@ -31,7 +31,8 @@ class LedString : public LedView {
 public:
     using led_index_t = Led::Led::index_t;
 
-    LedString(std::string description, float defaultBrightness, const HslColor& primaryColor, led_index_t ledCount);
+    LedString(const std::shared_ptr<KeyValueStore>& keyValueStore, const std::shared_ptr<Led::ColorManager>& colorManager, std::string description, float defaultBrightness,
+              const Led::HslwColor& primaryColor, led_index_t ledCount);
 
     ~LedString() override;
 
@@ -39,24 +40,47 @@ public:
         return m_ledCount;
     }
 
-    Rgb48Color getLedColor(Led::Led::index_t i) const override {
+    RgbwColor getLedColor(Led::Led::index_t i) const override {
         if (i >= m_ledCount) {
             return {0};
         }
         return m_leds[i].currentBaseColor;
     }
 
-    Led::Position getLedPosition(Led::Led::index_t) const override {
-        // TODO: 3D position aware LEDs
-        return {0, 0, 0};
+    bool isPositionAware() const override {
+        return true;
+    }
+
+    void setPosition(const Led::Position position) {
+        m_position = position;
+    }
+
+    Led::Position getPosition() const override {
+        return m_position;
+    }
+
+    void setLedPosition(const Led::Led::index_t index, const Led::Position position) {
+        if (index >= m_ledCount) {
+            return;
+        }
+        m_leds[index].position = position;
+    }
+
+    Led::Position getLedPosition(Led::Led::index_t index) const override {
+        if (index >= m_ledCount) {
+            return {0, 0, 0};
+        }
+        return m_leds[index].position;
     }
 
     void addAnimation(std::unique_ptr<AnimationConfig> config) override;
 
+    void endAllAnimations() const;
+
     void update();
 
 protected:
-    virtual void setLedColor(led_index_t index, Rgb48Color color) = 0;
+    virtual void setLedColor(led_index_t index, RgbwColor color) = 0;
 
     virtual void showLeds() = 0;
 
@@ -67,16 +91,18 @@ private:
         static_cast<LedString*>(pvTimerGetTimerID(timer))->update();
     }
 
+    Led::Position m_position;
+
     led_index_t m_ledCount;
     std::vector<Led::Led> m_leds;
 
-    std::vector<Led::Animation> m_animations;
+    std::chrono::system_clock::time_point m_manualAnimationReleaseTime;
+    std::list<std::unique_ptr<Led::Animation> > m_animations;
     std::mutex m_animationsMutex;
-
 
     TimerHandle_t m_updateTimer;
 
     static std::vector<bool> colorBufferUpdated;
-    static std::vector<Rgb48Color> colorBuffer;
+    static std::vector<RgbwColor> colorBuffer;
     static std::mutex colorBufferMutex;
 };

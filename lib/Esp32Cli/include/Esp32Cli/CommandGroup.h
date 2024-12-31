@@ -28,7 +28,7 @@ namespace Esp32Cli {
 
 class CommandGroup : public Command, protected CommandContainer {
 public:
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override;
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv, const std::shared_ptr<Client>& client) const override;
 
     void printUsage(Print& output) const override;
 

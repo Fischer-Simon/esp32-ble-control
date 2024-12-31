@@ -21,13 +21,13 @@
 #if ESP32_CLI_ENABLE_FS_COMMANDS
 
 namespace Esp32Cli {
-void ScriptCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const {
+void ScriptCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv, const std::shared_ptr<Client>& client) const {
     if (argv.size() < 2) {
         Cli::printUsage(io, commandName, *this);
         return;
     }
-    ScriptClient client{m_cli, argv[1].c_str(), &io};
-    client.executeCommandLine(Client::ExecType::Blocking);
+    auto scriptClient = std::make_shared<ScriptClient>(m_cli, argv[1].c_str(), &io);
+    scriptClient->executeCommandLine(Client::ExecType::Blocking);
 }
 
 void ScriptCommand::printUsage(Print& output) const {

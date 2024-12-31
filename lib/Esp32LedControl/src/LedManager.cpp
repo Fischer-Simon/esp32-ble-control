@@ -17,36 +17,12 @@
  */
 
 #include "LedManager.h"
-
-// trim from start (in place)
-inline void ltrim(std::string& s) {
-    s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](unsigned char ch) {
-        return !std::isspace(ch);
-    }));
-}
-
-// trim from end (in place)
-inline void rtrim(std::string& s) {
-    s.erase(std::find_if(s.rbegin(), s.rend(), [](unsigned char ch) {
-        return !std::isspace(ch);
-    }).base(), s.end());
-}
-
-inline void trim(std::string& s) {
-    ltrim(s);
-    rtrim(s);
-}
-
-inline std::string trim_copy(std::string s) {
-    ltrim(s);
-    rtrim(s);
-    return s;
-}
+#include "LedStrUtils.h"
 
 HsbColor HslToHsb(const HslColor& hsl) {
-    float h = hsl.H;  // Hue stays the same
+    float h = hsl.H; // Hue stays the same
     float s_h = hsl.S; // HSL Saturation
-    float l = hsl.L;  // Lightness in HSL
+    float l = hsl.L; // Lightness in HSL
 
     // Calculate Brightness (B) in HSB
     float b = l + s_h * (l * (1.0f - l));
@@ -63,6 +39,25 @@ HsbColor HslToHsb(const HslColor& hsl) {
     return {h, s_b, b};
 }
 
+LedManager::LedManager(std::shared_ptr<KeyValueStore> keyValueStore, std::shared_ptr<Led::ColorManager> colorManager,
+                       const std::shared_ptr<Js>& js)
+    : m_keyValueStore{std::move(keyValueStore)},
+      m_colorManager{std::move(colorManager)},
+      m_modelLocation{
+          m_keyValueStore->createValue("Settings", "ModelLocation", true, ModelLocation{0, 0, 0, 0})
+      },
+      m_manualModeOnStartup{
+          m_keyValueStore->createValue("Settings", "StartManual", true, false)
+      },
+      m_manualMode{
+          m_keyValueStore->createValue("Settings", "ManualMode", false, m_manualModeOnStartup->value())
+      },
+      m_startupAnimationEnabled{
+          m_keyValueStore->createValue("Settings", "StartAnimOn", true, true)
+      },
+      m_js{js} {
+}
+
 std::shared_ptr<LedView> LedManager::getLedViewByName(const std::string& name) {
     return m_ledViews.get(name.c_str());
 }
@@ -75,68 +70,43 @@ void LedManager::addLedView(const std::string& name, std::shared_ptr<LedView> le
     m_ledViews.set(name.c_str(), std::move(ledView));
 }
 
-HslColor LedManager::parseColor(const std::string& colorString, const std::shared_ptr<LedView>& ledView) const {
-    size_t bracketPosition = colorString.find_first_of('(');
-    size_t bracket2Position = colorString.find_first_of(')');
-    std::string colorType;
-    std::string colorValueStr;
-    if (bracketPosition == std::string::npos || bracket2Position == std::string::npos) {
-        colorType = colorString;
-    } else {
-        colorType = colorString.substr(0, bracketPosition);
-        colorValueStr = colorString.substr(bracketPosition + 1, bracket2Position - bracketPosition - 1);
+void LedManager::stopAllAnimations() const {
+    std::unique_lock<std::mutex> lock{m_mutex};
+    for (auto& ledString : m_ledStrings) {
+        ledString->endAllAnimations();
+    }
+}
+
+void LedManager::setManualMode(bool enable, bool save) const {
+    std::unique_lock<std::mutex> lock{m_mutex};
+
+    if (save && enable != m_manualModeOnStartup->value()) {
+        m_manualModeOnStartup->setValue(enable);
     }
 
-    trim(colorType);
-    trim(colorValueStr);
-
-    if (colorType == "rgb") {
-        size_t firstCommaPosition = colorValueStr.find_first_of(',');
-        size_t lastCommaPosition = colorValueStr.find_last_of(',');
-        if (firstCommaPosition == std::string::npos || lastCommaPosition == std::string::npos) {
-            return {0, 0, 0};
-        }
-        float r = strtof(colorValueStr.substr(0, firstCommaPosition).c_str(), nullptr);
-        float g = strtof(
-                colorValueStr.substr(firstCommaPosition + 1, lastCommaPosition - firstCommaPosition - 1).c_str(),
-                nullptr);
-        float b = strtof(colorValueStr.substr(lastCommaPosition + 1, std::string::npos).c_str(), nullptr);
-        return Rgb48Color{static_cast<uint16_t>(r * 65535), static_cast<uint16_t>(g * 65535),
-                          static_cast<uint16_t>(b * 65535)};
+    if (enable == m_manualMode->value()) {
+        return;
     }
 
-    if (colorType == "hsv" || colorType == "hsl") {
-        size_t firstCommaPosition = colorValueStr.find_first_of(',');
-        size_t lastCommaPosition = colorValueStr.find_last_of(',');
-        if (firstCommaPosition == std::string::npos || lastCommaPosition == std::string::npos) {
-            return {0, 0, 0};
-        }
-        float h = strtof(colorValueStr.substr(0, firstCommaPosition).c_str(), nullptr);
-        float s = strtof(
-                colorValueStr.substr(firstCommaPosition + 1, lastCommaPosition - firstCommaPosition - 1).c_str(),
-                nullptr);
-        float l = strtof(colorValueStr.substr(lastCommaPosition + 1, std::string::npos).c_str(), nullptr);
-        return colorType == "hsv" ? HslColor{Rgb48Color{HsbColor{h, s, l}}} : HslColor{h, s, l};
+    m_manualMode->setValue(enable);
+
+    if (!enable) {
+        m_js->runIdleAnimationStartHandlers();
+        return;
     }
 
-    HslColor baseColor;
-    if (colorType == "primary") {
-        if (!ledView) {
-            return {0, 0, 0};
-        }
-        baseColor = ledView->getPrimaryColor();
-    } else {
-        auto it = m_namedColors.find(colorType.c_str());
-        if (it == m_namedColors.end()) {
-            return {0, 0, 0};
-        }
-        baseColor = it->second;
-    }
-
-    float v = colorValueStr.empty() ? 1.f : strtof(colorValueStr.c_str(), nullptr);
-    return {baseColor.H, baseColor.S, baseColor.L * v};
+    m_js->rejectAllDelays();
+    lock.unlock();
+    stopAllAnimations();
 }
 
 void LedManager::addConfigErrorView(const std::string& name, const std::string& configKey, const std::string& error) {
-    addLedView(name, std::make_shared<InvalidLedView>("Missing or invalid config '" + configKey + "'" + (error.empty() ? "" : (": " + error))));
+    addLedView(
+        name,
+        std::make_shared<InvalidLedView>(
+            m_keyValueStore,
+            m_colorManager,
+            "Missing or invalid config '" + configKey + "'" + (error.empty() ? "" : (": " + error))
+        )
+    );
 }

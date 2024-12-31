@@ -19,10 +19,14 @@
 #pragma once
 
 #include <Arduino.h>
-#include <vector>
+#include <memory>
 #include <string>
+#include <vector>
 
 namespace Esp32Cli {
+
+class Client;
+
 class Command {
 public:
     Command() = default;
@@ -35,8 +39,9 @@ public:
      * @param io Command input and output
      * @param commandName Printable name for the command. Includes parent commands in case this is a sub command.
      * @param argv Command arguments. First entry is always the single name of the current command not including potential parent commands.
+     * @param client Client this execution comes from. Can be null if the command was not executed by an external client.
      */
-    virtual void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const = 0;
+    virtual void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv, const std::shared_ptr<Client>& client) const = 0;
 
     virtual void printUsage(Print& output) const {
         output.println();

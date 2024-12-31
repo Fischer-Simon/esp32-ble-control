@@ -1,0 +1,17 @@
+{
+  "name": "KeyValueStore",
+  "version": "0.0.1",
+  "description": "A simple key value store",
+  "keywords": "esp32",
+  "authors":
+  [
+    {
+      "name": "Simon Fischer"
+    }
+  ],
+  "dependencies": {
+  },
+  "license": "GPLv3",
+  "frameworks": "arduino",
+  "platforms": "espressif32"
+}

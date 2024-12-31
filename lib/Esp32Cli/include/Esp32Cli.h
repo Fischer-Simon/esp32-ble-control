@@ -39,7 +39,7 @@ public:
 
     void setFirmwareInfo(std::string firmwareInfo);
 
-    void executeCommand(Stream& io, std::vector<std::string>& argv) const;
+    void executeCommand(Stream& io, std::vector<std::string>& argv, const std::shared_ptr<Client>& client = nullptr) const;
 
     void printCommandNotFound(Print& output, const std::string& commandName) const;
 
@@ -59,7 +59,7 @@ private:
         explicit HelpCommand(Cli& cli) : m_cli{cli} {
         }
 
-        void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override;
+        void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv, const std::shared_ptr<Client>& client) const override;
 
     private:
         Cli& m_cli;

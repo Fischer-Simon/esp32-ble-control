@@ -31,7 +31,7 @@ struct Led {
     /**
      * The current color before any running animations have been applied.
      */
-    Rgb48Color currentBaseColor{0, 0, 0};
+    RgbwColor currentBaseColor{0, 0, 0};
 
     /**
      * Position in space of this led relative to the @link LedString

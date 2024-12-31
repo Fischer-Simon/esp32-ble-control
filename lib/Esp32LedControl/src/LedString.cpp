@@ -21,12 +21,15 @@
 #include <chrono>
 
 std::vector<bool> LedString::colorBufferUpdated;
-std::vector<Rgb48Color> LedString::colorBuffer;
+std::vector<RgbwColor> LedString::colorBuffer;
 std::mutex LedString::colorBufferMutex;
 
-LedString::LedString(std::string description, float defaultBrightness, const HslColor& primaryColor, led_index_t ledCount)
-    : LedView{std::move(description), defaultBrightness, primaryColor},
-      m_ledCount{ledCount} {
+LedString::LedString(const std::shared_ptr<KeyValueStore>& keyValueStore, const std::shared_ptr<Led::ColorManager>& colorManager, std::string description,
+                     float defaultBrightness, const Led::HslwColor& primaryColor,
+                     led_index_t ledCount)
+    : LedView{keyValueStore, colorManager, std::move(description), defaultBrightness, primaryColor},
+      m_ledCount{ledCount},
+      m_manualAnimationReleaseTime{std::chrono::system_clock::now()} {
     m_leds.resize(ledCount);
     ensureColorBufferSize(ledCount);
     m_updateTimer = xTimerCreate("led_update", pdMS_TO_TICKS(16), pdTRUE, this, &updateTimerFn);
@@ -37,10 +40,11 @@ LedString::LedString(std::string description, float defaultBrightness, const Hsl
 }
 
 LedString::~LedString() {
-    xTimerDelete(m_updateTimer, pdMS_TO_TICKS(200));
+    xTimerDelete(m_updateTimer, portMAX_DELAY);
 }
 
 void LedString::addAnimation(std::unique_ptr<AnimationConfig> config) {
+    const auto now = std::chrono::system_clock::now();
     if (config->leds.empty()) {
         config->leds.resize(m_ledCount);
         for (led_index_t i = 0; i < m_ledCount; i++) {
@@ -48,37 +52,106 @@ void LedString::addAnimation(std::unique_ptr<AnimationConfig> config) {
         }
     }
 
-    if (config->ledDelay < std::chrono::milliseconds(0)) {
-        config->ledDelay *= -1;
+    if (config->halfCycles < 0) {
+        config->halfCycles *= -1;
         std::reverse(config->leds.begin(), config->leds.end());
     }
 
-    const std::default_random_engine::result_type randomSeed = esp_random();
-    const auto startTime = std::chrono::system_clock::now() + config->startDelay;
-    const auto endTime = startTime + (config->leds.size() * config->ledDelay) + config->ledDuration;
+    if (!config->targetColorStr.empty()) {
+        config->targetColor = m_colorManager->parseColor(config->targetColorStr, getPrimaryColor());
+        config->targetColorStr.clear();
+    }
+    config->targetColor.dim(getBrightness());
+
+    std::vector<Animation::PerLed> perLedData;
+    perLedData.reserve(config->leds.size());
+
+    const auto startTime = now + config->startDelay;
+    auto endTime = startTime;
+    float cosA = cosf(config->modelLocation.angleRad);
+    float sinA = sinf(config->modelLocation.angleRad);
+    for (size_t i = 0; i < config->leds.size(); i++) {
+        Animation::duration ledDuration = config->ledDuration.eval(config->leds.size());
+        Animation::duration ledDelay;
+        uint16_t ledBrightnessFactor{65535};
+        if (config->animationType == AnimationType::Wave3D) {
+            auto ledPosition = getLedPosition(config->leds[i]);
+
+            float x = getPosition().x + ledPosition.x;
+            float y = getPosition().y + ledPosition.y;
+            float z = getPosition().z + ledPosition.z;
+
+            float localX = x * cosA - y * sinA;
+            float localY = x * sinA + y * cosA;
+
+            x = localX + config->modelLocation.x - std::get<0>(config->startPos);
+            y = localY + config->modelLocation.y - std::get<1>(config->startPos);
+            z = z + config->modelLocation.z - std::get<2>(config->startPos);
+
+            float distance = std::sqrt(x * x + y * y + z * z);
+            ledDelay = config->ledDelay.eval(config->leds.size(), distance);
+            if (config->range > 0) {
+                ledBrightnessFactor = static_cast<uint16_t>(65535 * Easing::easeOutSine(std::max(0.f, 1 - (distance / config->range))));
+            }
+        } else {
+            ledDelay = config->ledDelay.eval(config->leds.size(), static_cast<float>(i));
+        }
+
+        auto ledEndTime = startTime + ledDelay + ledDuration;
+        endTime = std::max(endTime, ledEndTime);
+
+        perLedData.emplace_back(
+            config->leds[i],
+            ledDuration,
+            ledDelay,
+            ledBrightnessFactor
+        );
+    }
 
     if (config->halfCycles % 2 == 1 && config->blending != Led::Blending::Add) {
+        auto animationTargetColor = config->targetColor;
+        animationTargetColor.setBrightness(1);
         for (auto& ledView: config->affectedLedViews) {
             ledView->updateAnimationTargetColor(config->targetColor, endTime);
         }
+        updateAnimationTargetColor(config->targetColor, endTime);
     }
 
     std::unique_lock<std::mutex> animationsLock{m_animationsMutex};
-    m_animations.emplace_back(Animation{
-        .randomSeed = randomSeed,
-        .blending = config->blending,
-        .easing = config->easing,
-        .targetColor = HslColor{config->targetColor.H, config->targetColor.S, config->targetColor.L * config->targetBrightness},
-        .startTime = startTime,
-        .ledDuration = config->ledDuration,
-        .ledDelay = config->ledDelay,
-        .halfCycles = config->halfCycles,
-        .endTime = endTime,
-        .leds = std::move(config->leds),
-    });
-    std::sort(m_animations.begin(), m_animations.end(), [](const Animation& lhs, const Animation& rhs) {
-        return lhs.endTime < rhs.endTime;
-    });
+
+    auto it = config->blending != Led::Blending::Add ? m_animations.begin() : m_animations.end();
+    while (it != m_animations.end()) {
+        const auto& animation = it->get();
+        if (endTime < animation->endTime || animation->blending == Led::Blending::Add) {
+            break;
+        }
+        ++it;
+    }
+    m_animations.emplace(
+        it,
+        std::unique_ptr<Animation>(new Animation{
+            .blending = config->blending,
+            .easing = config->easing,
+            .targetColor = config->targetColor,
+            .startTime = startTime,
+            .endTime = endTime,
+            .halfCycles = config->halfCycles,
+            .leds = std::move(perLedData),
+        }));
+}
+
+void LedString::endAllAnimations() const {
+    auto now = std::chrono::system_clock::now();
+    for (const auto& animation: m_animations) {
+        animation->endTime = now;
+        for (const auto& ledViewWeak: animation->affectedLedViews) {
+            auto ledView = ledViewWeak.lock();
+            if (!ledView) {
+                continue;
+            }
+            ledView->setCurrentAnimationEnd(now);
+        }
+    }
 }
 
 void LedString::update() {
@@ -91,62 +164,67 @@ void LedString::update() {
     const auto now = std::chrono::system_clock::now();
     std::unique_lock<std::mutex> animationsLock{m_animationsMutex};
     bool anyAnimationActive = false;
-    for (const auto& animation: m_animations) {
-        if (now < animation.startTime) {
+    for (auto it = m_animations.begin(); it != m_animations.end();) {
+        auto& animation = *it;
+        if (now < animation->startTime) {
+            it++;
             continue;
         }
-        auto animationTimeRunning = std::chrono::duration_cast<Led::Animation::duration>(now - animation.startTime);
-        bool animationFinishes = now > animation.endTime;
-        for (size_t i = 0; i < animation.leds.size(); i++) {
-            if (animationTimeRunning < std::chrono::seconds(0)) {
-                break;
+        auto targetColor = animation->targetColor.toRgbwColor();
+        bool animationFinishes = animation->endTime <= now;
+        for (size_t i = 0; i < animation->leds.size(); i++) {
+            Animation::PerLed& led = animation->leds[i];
+
+            auto ledStartTime = animation->startTime + led.ledDelay;
+            if (now < ledStartTime) {
+                continue;
             }
+            auto animationTimeRunning = std::chrono::duration_cast<Led::Animation::duration>(now - ledStartTime);
 
-            led_index_t ledIndex = animation.leds[i];
+            led_index_t ledIndex = led.ledIndex;
             auto& ledColor = colorBuffer[ledIndex];
-            float animationProgress = std::min(
+            float animationProgress = led.ledDuration.count() > 0 ? std::min(
                 1.f, static_cast<float>(animationTimeRunning.count()) /
-                     static_cast<float>(animation.ledDuration.count())
-            );
+                     static_cast<float>(led.ledDuration.count())
+            ) : 1.f;
 
-            animationProgress *= static_cast<float>(animation.halfCycles);
+            animationProgress *= static_cast<float>(animation->halfCycles);
             const int animationCycle = static_cast<int>(animationProgress);
             animationProgress -= static_cast<float>(animationCycle);
             if (animationCycle % 2) {
                 animationProgress = 1 - animationProgress;
             }
 
-            float blendValue = animation.easing(animationProgress);
-            switch (animation.blending) {
+            float blendValue = animation->easing(animationProgress) * (static_cast<float>(led.ledBrightnessFactor) / 65535.f);
+            switch (animation->blending) {
                 case Led::Blending::Blend:
-                    ledColor = Rgb48Color::LinearBlend(ledColor, animation.targetColor, blendValue);
+                    ledColor = RgbwColor::LinearBlend(ledColor, targetColor, blendValue);
                     break;
                 case Led::Blending::Add: {
-                    auto addColor = Rgb48Color::LinearBlend({0, 0, 0}, animation.targetColor, blendValue);
-                    ledColor = Rgb48Color(
-                        std::min(65535, ledColor.R + addColor.R),
-                        std::min(65535, ledColor.G + addColor.G),
-                        std::min(65535, ledColor.B + addColor.B)
+                    auto addColor = RgbwColor::LinearBlend({0, 0, 0}, targetColor, blendValue);
+                    ledColor = RgbwColor(
+                        std::min(255, ledColor.R + addColor.R),
+                        std::min(255, ledColor.G + addColor.G),
+                        std::min(255, ledColor.B + addColor.B),
+                        std::min(255, ledColor.W + addColor.W)
                     );
                 }
                 break;
-                case Led::Blending::Overwrite:
-                    ledColor = Rgb48Color::LinearBlend({0, 0, 0}, animation.targetColor, blendValue);
-                    break;
             }
             colorBufferUpdated[ledIndex] = true;
-            if (animationFinishes) {
+            if (animationFinishes && animation->blending != Led::Blending::Add) {
                 m_leds[ledIndex].currentBaseColor = ledColor;
             }
 
-            animationTimeRunning -= animation.ledDelay;
             anyAnimationActive = true;
         }
+
+        if (animationFinishes) {
+            it = m_animations.erase(it);
+        } else {
+            ++it;
+        }
     }
-    m_animations.erase(std::remove_if(m_animations.begin(), m_animations.end(),
-                                      [&now](const Led::Animation& animation) {
-                                          return now > animation.endTime;
-                                      }), m_animations.end());
     animationsLock.unlock();
 
     if (!anyAnimationActive) {

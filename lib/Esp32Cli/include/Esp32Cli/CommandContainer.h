@@ -48,6 +48,7 @@ protected:
         if (it != m_commands.end()) {
             return it->second.get();
         }
+        return nullptr;
     }
 
     LightweightMap<std::unique_ptr<Command>> m_commands;

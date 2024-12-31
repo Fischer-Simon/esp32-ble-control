@@ -18,15 +18,53 @@
 
 #include "Led/Animation.h"
 
+#include <LedView.h>
+
+#include "LedStrUtils.h"
+
 namespace Led {
-Animation::duration Animation::parseDuration(const std::string& durationStr) {
+
+inline bool ends_with(std::string const & value, std::string const & ending)
+{
+    if (ending.size() > value.size()) return false;
+    return std::equal(ending.rbegin(), ending.rend(), value.rbegin());
+}
+
+Animation::RndDuration Animation::parseDuration(std::string durationStr) {
+    if (durationStr.empty()) {
+        return {};
+    }
+
+    bool delayIsGlobal = false;
+    if (durationStr.front() == '=') {
+        delayIsGlobal = true;
+        durationStr.erase(durationStr.begin());
+    }
+
+    if (durationStr.size() > 2 && durationStr[0] == '[') {
+        ltrim(durationStr, '[');
+        rtrim(durationStr, ']');
+        auto minMaxValue = split_str(durationStr, ',');
+        if (minMaxValue.size() != 2) {
+            return {};
+        }
+        auto minValue = parseDuration(minMaxValue[0]);
+        auto maxValue = parseDuration(minMaxValue[1]);
+
+        return {
+            minValue.eval(1),
+            maxValue.eval(1),
+            minValue.perLed || maxValue.perLed,
+            delayIsGlobal
+        };
+    }
+
     char* endOfNumber = nullptr;
     auto number = std::strtoul(durationStr.c_str(), &endOfNumber, 0);
     if (endOfNumber[0] == 's') {
         number *= 1000;
-    } else if (std::string{endOfNumber} == "min") {
-        number *= 60000;
     }
-    return std::chrono::milliseconds(number);
+    bool perLed = !ends_with(endOfNumber, "/n");
+    return {durationFromMs(number), durationFromMs(number), perLed, delayIsGlobal};
 }
 }

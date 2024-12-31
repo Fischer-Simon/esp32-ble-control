@@ -97,7 +97,7 @@ void Client::executeCommandLine(const ExecType execType) {
                 m_parserState.argv.emplace_back(m_parserState.arg);
                 m_parserState.arg.clear();
             }
-            m_cli->executeCommand(*this, m_parserState.argv);
+            m_cli->executeCommand(*this, m_parserState.argv, shared_from_this());
             onCommandEnd();
             m_parserState.argv.clear();
             m_parserState.argvSize = 0;

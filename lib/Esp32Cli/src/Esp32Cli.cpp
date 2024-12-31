@@ -49,7 +49,7 @@ void Cli::setFirmwareInfo(std::string firmwareInfo) {
     m_firmwareInfo = std::move(firmwareInfo);
 }
 
-void Cli::executeCommand(Stream& io, std::vector<std::string>& argv) const {
+void Cli::executeCommand(Stream& io, std::vector<std::string>& argv, const std::shared_ptr<Client>& client) const {
     if (argv.empty()) {
         return;
     }
@@ -61,7 +61,7 @@ void Cli::executeCommand(Stream& io, std::vector<std::string>& argv) const {
         printCommandNotFound(io, commandName);
         return;
     }
-    command->execute(io, commandName, argv);
+    command->execute(io, commandName, argv, client);
 }
 
 void Cli::printCommandNotFound(Print& output, const std::string& commandName) const {
@@ -91,7 +91,7 @@ void Cli::printPrompt(Print& output) const {
     output.print("> ");
 }
 
-void Cli::HelpCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const {
+void Cli::HelpCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv, const std::shared_ptr<Client>& client) const {
     if (argv.size() <= 1) {
         io.print("Available commands: ");
         bool isFirst = true;

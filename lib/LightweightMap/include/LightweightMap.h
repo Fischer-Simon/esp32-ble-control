@@ -98,6 +98,14 @@ public:
         return m_entries.end();
     }
 
+    void clear() {
+        for (auto& entry: m_entries) {
+            free(entry.first);
+            entry.first = nullptr;
+        }
+        m_entries.clear();
+    }
+
     const std::vector<entry_t>& getEntries() const {
         return m_entries;
     }

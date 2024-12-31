@@ -22,7 +22,11 @@
 
 void MappedLedView::addAnimation(std::unique_ptr<AnimationConfig> config) {
     config->affectedLedViews.emplace_back(shared_from_this());
-    config->targetBrightness *= getBrightness();
+    if (!config->targetColorStr.empty() && hasPrimaryColor()) {
+        config->targetColor = m_colorManager->parseColor(config->targetColorStr, getPrimaryColor());
+        config->targetColorStr.clear();
+    }
+    config->targetColor.dim(getBrightness());
     if (config->leds.empty()) {
         config->leds = m_ledMap;
     } else {
@@ -40,17 +44,49 @@ void MappedLedView::addAnimation(std::unique_ptr<AnimationConfig> config) {
 void MirroredLedView::addAnimation(std::unique_ptr<AnimationConfig> config) {
     config->affectedLedViews.emplace_back(shared_from_this());
     for (size_t i = 0; i < m_parents.size() - 1; i++) {
+        const auto& parent = m_parents[i];
         m_parents[i]->addAnimation(std::unique_ptr<AnimationConfig>(new AnimationConfig(*config)));
     }
+
     m_parents.back()->addAnimation(std::move(config));
 }
 
 void MirroredLedView::setBrightness(float brightness) {
+    LedView::setBrightness(brightness);
     for (auto& parent : m_parents) {
         parent->setBrightness(brightness);
     }
 }
 
-float MirroredLedView::getBrightness() const {
-    return m_parents.front()->getBrightness();
+void CombinedLedView::addAnimation(std::unique_ptr<AnimationConfig> config) {
+    config->affectedLedViews.emplace_back(shared_from_this());
+    Led::Led::index_t baseIndex = 0;
+    for (size_t i = 0; i < m_parents.size() - 1; i++) {
+        auto parentLedCount = m_parents[i]->getLedCount();
+        std::unique_ptr<AnimationConfig> newConfig{new AnimationConfig(*config)};
+        for (auto& ledIndex : newConfig->leds) {
+            if (ledIndex < baseIndex || ledIndex >= baseIndex + parentLedCount) {
+                ledIndex = Led::Led::InvalidIndex;
+            } else {
+                ledIndex -= baseIndex;
+            }
+        }
+        m_parents[i]->addAnimation(std::move(newConfig));
+        baseIndex += parentLedCount;
+    }
+    for (auto& ledIndex : config->leds) {
+        if (ledIndex < baseIndex || ledIndex >= baseIndex + m_parents.back()->getLedCount()) {
+            ledIndex = Led::Led::InvalidIndex;
+        } else {
+            ledIndex -= baseIndex;
+        }
+    }
+    m_parents.back()->addAnimation(std::move(config));
+}
+
+void CombinedLedView::setBrightness(float brightness) {
+    LedView::setBrightness(brightness);
+    for (auto& parent : m_parents) {
+        parent->setBrightness(brightness);
+    }
 }

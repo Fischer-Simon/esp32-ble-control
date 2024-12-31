@@ -20,8 +20,7 @@
 
 namespace Led {
 enum class Blending {
-    Add,
     Blend,
-    Overwrite,
+    Add,
 };
 }

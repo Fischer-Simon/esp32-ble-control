@@ -17,7 +17,7 @@
  */
 
 #include "Esp32BleUi.h"
-#include "Esp32BleUiPriv.h"
+#include "Esp32BleUiClient.h"
 
 #define BLE_SERVICE_UUID "afc3eba8-ba5e-42be-8d3c-94c7fe325ba1"
 #define RX_CHARACTERISTIC_UUID "f72bac71-f66f-4cce-b83f-a4218f482706"
@@ -30,7 +30,7 @@
 // #define VERBOSE_LOG
 
 Esp32BleUi::Esp32BleUi(std::shared_ptr<Esp32Cli::Cli> cli)
-        : m_cli(std::move(cli)) {
+    : m_cli(std::move(cli)) {
     NimBLEDevice::init(m_cli->getHostname());
 
     // TODO: Fix secure encrypted BLE for encrypted firmware updates.
@@ -58,18 +58,23 @@ Esp32BleUi::Esp32BleUi(std::shared_ptr<Esp32Cli::Cli> cli)
 
     NimBLEAdvertising* pAdvertising = NimBLEDevice::getAdvertising();
     pAdvertising->addServiceUUID(m_bleService->getUUID());
+    pAdvertising->setMinInterval(100);
+    pAdvertising->setMaxInterval(200);
     pAdvertising->setScanResponse(true);
     pAdvertising->start();
 
     esp_bt_sleep_enable();
 
-    if (xTaskCreate(&Esp32BleUi::runTxQueue, "tx_queue", 2048, this, 2, &m_txTask) != pdPASS) {
+    if (xTaskCreate(&Esp32BleUi::runTxQueue, "tx_queue", 2048, this, 1, &m_txTask) != pdPASS) {
         log_e("Failed to create BLE Cli TX task");
         ESP.restart();
     }
 }
 
 Esp32BleUi::~Esp32BleUi() {
+    if (m_metrics) {
+        m_metrics->removeValueChangeCallback(this);
+    }
     vTaskDelete(m_txTask);
     vTaskDelete(m_metricsTask);
     NimBLEDevice::deinit(true);
@@ -85,7 +90,6 @@ void Esp32BleUi::onConnect(NimBLEServer* pServer, ble_gap_conn_desc* desc) {
     std::unique_lock<std::mutex> clientsLock{m_clientsMutex};
     m_clients.emplace_back(std::make_shared<Client>(m_cli, m_txTask, desc->conn_handle));
     auto client = m_clients.back();
-    client->setTimeout(3567587327);
 
     Serial.printf("Got new BLE client %i (%s)\n", desc->conn_handle,
                   NimBLEAddress(desc->peer_ota_addr).toString().c_str());
@@ -96,8 +100,10 @@ void Esp32BleUi::onConnect(NimBLEServer* pServer, ble_gap_conn_desc* desc) {
 
     pServer->setDataLen(desc->conn_handle, 0x00FB);
 
+    pServer->updateConnParams(desc->conn_handle, 8, 24, 0, 400);
+
     auto clientPtr = new std::shared_ptr<Client>(client);
-    if (xTaskCreate(&runClient, "ble_client", 4096, clientPtr, 1, nullptr) != pdPASS) {
+    if (xTaskCreatePinnedToCore(&runClient, "ble_client", 4096, clientPtr, 0, nullptr, ARDUINO_RUNNING_CORE) != pdPASS) {
         log_e("Failed to create BLE client task");
         delete clientPtr;
         m_clients.pop_back();
@@ -107,14 +113,14 @@ void Esp32BleUi::onConnect(NimBLEServer* pServer, ble_gap_conn_desc* desc) {
 void Esp32BleUi::onDisconnect(NimBLEServer* pServer, ble_gap_conn_desc* desc) {
     std::unique_lock<std::mutex> clientsLock{m_clientsMutex};
     auto clientIterator = std::remove_if(
-            m_clients.begin(), m_clients.end(),
-            [desc](const std::shared_ptr<Client>& client) {
-                return client->m_connHandle == desc->conn_handle;
-            });
+        m_clients.begin(), m_clients.end(),
+        [desc](const std::shared_ptr<Client>& client) {
+            return client->m_connHandle == desc->conn_handle;
+        });
     if (clientIterator == m_clients.end()) {
         return;
     }
-    const auto& client = *clientIterator;
+    const auto client = *clientIterator;
     std::unique_lock<std::mutex> clientRxBufferLock{client->m_rxBufferMutex};
     std::unique_lock<std::mutex> clientTxBufferLock{client->m_txBufferMutex};
     client->m_txTask = nullptr;
@@ -122,17 +128,22 @@ void Esp32BleUi::onDisconnect(NimBLEServer* pServer, ble_gap_conn_desc* desc) {
     client->m_txBufferNotifier.notify_all();
     client->m_rxBufferGivenNotifier.notify_all();
     client->m_rxBufferTakenNotifier.notify_all();
+    client->onDisconnect();
     m_clients.erase(clientIterator);
     Serial.printf("Client %i disconnected\n", desc->conn_handle);
 }
 
-void Esp32BleUi::setMetrics(std::shared_ptr<Esp32BleMetrics> metrics) {
-    m_metrics = std::move(metrics);
-    if (xTaskCreate(&Esp32BleUi::runMetrics, "metrics", 2048, this, 2, &m_metricsTask) != pdPASS) {
+void Esp32BleUi::setKeyValueStore(std::shared_ptr<KeyValueStore> keyValueStore) {
+    m_metrics = std::move(keyValueStore);
+    if (xTaskCreatePinnedToCore(&Esp32BleUi::runMetrics, "metrics", 2048, this, 2, &m_metricsTask, ARDUINO_RUNNING_CORE) != pdPASS) {
         log_e("Failed to create BLE Cli metrics task");
         ESP.restart();
     }
-    m_metrics->setMetricsTask(m_metricsTask);
+    m_metrics->addValueChangeCallback(this, [this](const std::shared_ptr<const KeyValueStore::Value>& value) {
+        std::unique_lock<std::mutex> lock{m_metricsMutex};
+        m_changedMetrics.set(value->name(), value);
+        xTaskNotifyGive(m_metricsTask);
+    });
 }
 
 size_t Esp32BleUi::Client::write(const uint8_t* buffer, size_t size) {
@@ -250,14 +261,13 @@ void Esp32BleUi::Client::onCommandEnd() {
 }
 
 void Esp32BleUi::onRxWrite(ble_gap_conn_desc* desc) {
-    std::shared_ptr<Client> client;
-    {
+    std::shared_ptr<Client> client; {
         std::unique_lock<std::mutex> clientsLock{m_clientsMutex};
         auto clientIterator = std::find_if(
-                m_clients.begin(), m_clients.end(),
-                [desc](const std::shared_ptr<Client>& client) {
-                    return client->m_connHandle == desc->conn_handle;
-                });
+            m_clients.begin(), m_clients.end(),
+            [desc](const std::shared_ptr<Client>& client) {
+                return client->m_connHandle == desc->conn_handle;
+            });
         if (clientIterator == m_clients.end()) {
             Serial.printf("Got %i bytes for unknown client\n", m_rxCharacteristic->getValue().size());
             return;
@@ -342,33 +352,50 @@ void Esp32BleUi::onRxWrite(ble_gap_conn_desc* desc) {
 #endif
                 }
             }
-            dataToSend |= client->m_txBuffer.available() || client->m_txBuffer.shouldFlush() || client->
-                    m_rxAckPendingBytes;
+            dataToSend |= client->m_txBuffer.available() || client->m_txBuffer.shouldFlush() || client->m_rxAckPendingBytes;
             // Serial.printf("%i %i %i %i %i\n", client->m_txBuffer.available(), client->m_rxAckPendingBytes, rxAckSendRet, txRet, dataToSend);
         }
     }
 }
 
 void Esp32BleUi::processMetrics() {
-    bool dataToSend = false;
     while (true) {
-        if (dataToSend) {
-            delay(20);
-        } else {
-            ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000000));
-        }
-        dataToSend = false;
+        ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000000));
 
-        auto metricBuffer = m_metrics->getChangedBuffer();
-        if (metricBuffer.first.empty()) {
-            continue;
-        }
+        std::unique_lock<std::mutex> metricsLock{m_metricsMutex};
 
-        size_t sendSize = std::min(BLE_CHUNK_SIZE, metricBuffer.first.available());
+        auto it = m_changedMetrics.getEntries().begin();
+        while (it != m_changedMetrics.getEntries().end()) {
+            auto& metric = *it->second;
+            size_t metricSize;
+            size_t writtenSize = metric.writeToBuffer(
+                m_changedMetricsBuffer.tail(), m_changedMetricsBuffer.free(), &metricSize
+            );
+            m_changedMetricsBuffer.push(writtenSize);
+            if (metricSize > m_changedMetricsBuffer.capacity()) {
+                log_e("Metric '%s' does not fit in buffer (%i > %i)\n", metric.name(), metricSize,
+                      m_changedMetricsBuffer.capacity());
+                ++it;
+                continue;
+            }
+            if (writtenSize == 0) {
+                processChangedMetricsBuffer();
+            } else {
+                ++it;
+            }
+        }
+        processChangedMetricsBuffer();
+        m_changedMetrics.clear();
+    }
+}
+
+void Esp32BleUi::processChangedMetricsBuffer() {
+    while (!m_changedMetricsBuffer.empty()) {
+        size_t sendSize = std::min(BLE_CHUNK_SIZE, m_changedMetricsBuffer.available());
         bool sendFailure = false;
         std::unique_lock<std::mutex> clientsLock{m_clientsMutex};
-        for (auto& client: m_clients) {
-            os_mbuf* om = ble_hs_mbuf_from_flat(metricBuffer.first.data(), sendSize);
+        for (const auto& client: m_clients) {
+            os_mbuf* om = ble_hs_mbuf_from_flat(m_changedMetricsBuffer.data(), sendSize);
             if (om == nullptr) {
                 sendFailure = true;
                 break;
@@ -378,11 +405,11 @@ void Esp32BleUi::processMetrics() {
                 break;
             }
         }
-
         if (!sendFailure) {
-            metricBuffer.first.pop(sendSize);
+            m_changedMetricsBuffer.pop(sendSize);
+        } else {
+            delay(20);
         }
-        dataToSend = !metricBuffer.first.empty();
     }
 }
 

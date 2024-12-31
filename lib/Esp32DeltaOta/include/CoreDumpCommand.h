@@ -22,7 +22,7 @@
 
 class CoreDumpCommand : public Esp32Cli::Command {
 public:
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override {
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv, const std::shared_ptr<Esp32Cli::Client>&) const override {
         if (esp_core_dump_image_check() != ESP_OK) {
             io.println("No core dump found");
             return;

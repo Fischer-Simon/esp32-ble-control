@@ -30,17 +30,21 @@
 #include <sys/stat.h>
 #endif
 
+#include <LittleFS.h>
+
 #include "Esp32Cli.h"
 
 #define STATS_TICKS         pdMS_TO_TICKS(1000)
 #define ARRAY_SIZE_OFFSET   5   //Increase this if print_real_time_stats returns ESP_ERR_INVALID_SIZE
 
 namespace Esp32Cli {
-void HostnameCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const {
+void HostnameCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv,
+                              const std::shared_ptr<Client>& client) const {
     io.println(m_cli.getHostname().c_str());
 }
 
-void MemCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const {
+void MemCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv,
+                         const std::shared_ptr<Client>& client) const {
     multi_heap_info_t info{};
     heap_caps_get_info(&info, MALLOC_CAP_DEFAULT);
 
@@ -56,7 +60,8 @@ void resetTimerFn(void*) {
     ESP.restart();
 }
 
-void ResetCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const {
+void ResetCommand::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv,
+                           const std::shared_ptr<Esp32Cli::Client>& client) const {
     int delayMs = 200;
     if (argv.size() == 2) {
         delayMs = strtol(argv[1].c_str(), nullptr, 0);
@@ -79,10 +84,10 @@ void IpCommand::execute(Stream& io, const std::string& commandName, std::vector<
 
 #if ESP32_CLI_ENABLE_FS_COMMANDS
 namespace FsCommands {
-
 class TouchCommand : public Command {
 public:
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& args) const override {
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& args,
+                 const std::shared_ptr<Client>& client) const override {
         if (args.size() != 2) {
             Cli::printUsage(io, commandName, *this);
             return;
@@ -98,7 +103,8 @@ public:
 
 class CatCommand : public Command {
 public:
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& args) const override {
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& args,
+                 const std::shared_ptr<Client>& client) const override {
         if (args.size() != 2) {
             Cli::printUsage(io, commandName, *this);
             return;
@@ -123,7 +129,8 @@ public:
 
 class WriteCommand : public Command {
 public:
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& args) const override {
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& args,
+                 const std::shared_ptr<Client>& client) const override {
         if (args.size() != 3) {
             Cli::printUsage(io, commandName, *this);
             return;
@@ -165,46 +172,117 @@ public:
 
 class LsCommand : public Command {
 public:
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& args) const override {
-        if (args.size() != 2) {
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv,
+                 const std::shared_ptr<Client>& client) const override {
+        if (argv.size() < 2) {
             Cli::printUsage(io, commandName, *this);
             return;
         }
 
+        bool verbose = false;
+        if (argv[1] == "-l") {
+            verbose = true;
+        }
+
+        struct DirEnt {
+            enum Type {
+                Unknown,
+                Dir,
+                File,
+            } type;
+
+            std::string name;
+            size_t size;
+
+            DirEnt(Type type_, std::string name_, size_t size_) : type(type_), name(name_), size(size_) {
+            }
+        };
+        std::vector<DirEnt> entries;
         DIR* dir;
-        struct dirent* dp;
+        dirent* dp;
         struct stat stat{};
 
-        if ((dir = opendir(args[1].c_str())) == nullptr) {
-            io.println("Failed to open directory");
-            return;
-        }
+        for (size_t i = verbose ? 2 : 1; i < argv.size(); i++) {
+            if ((dir = opendir(argv[i].c_str())) == nullptr) {
+                io.printf("Failed to open directory %s\n", argv[i].c_str());
+                continue;
+            }
 
-        while ((dp = readdir(dir)) != nullptr) {
-            io.print(dp->d_name);
-            io.print(' ');
+            while ((dp = readdir(dir)) != nullptr) {
+                if (verbose) {
+                    printLongFormat(io, argv[i].c_str(), dp->d_name);
+                } else {
+                    io.print(dp->d_name);
+                    io.print(' ');
+                }
+            }
+            if (!verbose) {
+                io.println();
+            }
+
+            closedir(dir);
         }
-        io.println();
     }
 
     void printUsage(Print& output) const override {
-        output.println("<dir_name>");
+        output.println("[-l] <dir_name>");
+    }
+private:
+    void printLongFormat(Stream& io, const char* directory, const char* filename) const {
+        struct stat fileStat;
+        std::string fullPath = std::string{directory} + "/" + filename;
+
+        if (stat(fullPath.c_str(), &fileStat) == -1) {
+            io.printf("Error: Could not retrieve information for file %s\n", filename);
+            return;
+        }
+
+        // Permissions string
+        char permissions[2];
+        permissions[0] = (S_ISDIR(fileStat.st_mode)) ? 'd' : '-';
+        permissions[1] = '\0';
+
+        // File size in human-readable format
+        std::string size = humanReadableSize(fileStat.st_size);
+
+        // Last modification time
+        char timeBuf[20];
+        struct tm* timeinfo = localtime(&fileStat.st_mtime);
+        strftime(timeBuf, sizeof(timeBuf), "%b %d %H:%M", timeinfo);
+
+        // Print everything in a single formatted line
+        io.printf("%s %8s %s %s\n",
+                  permissions,                        // Permissions
+                  size.c_str(),                       // Human-readable file size
+                  timeBuf,                            // Modification time
+                  filename);                          // Filename
+    }
+
+    static std::string humanReadableSize(off_t bytes) {
+        const char* suffixes[] = {"B", "K", "M", "G", "T"};
+        size_t i = 0;
+        float size = bytes;
+
+        while (size >= 1024 && i < 4) {
+            size /= 1024;
+            ++i;
+        }
+
+        char output[10];
+        std::snprintf(output, sizeof(output), "%.1f%s", size, suffixes[i]);
+        return std::string(output);
     }
 };
 
-// TODO: Make df command indipendent of global fs instance.
-#if 0
-class DfCommand : public ShellCommand {
+class DfCommand : public Command {
 public:
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& args) override {
-
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& args,
+                 const std::shared_ptr<Client>& client) const override {
         io.printf("Filesystem     Size     Used    Avail Use%% Mounted on\r\n");
-        io.printf("littlefs   % 8i % 8i % 8i % 3i%% /data\r\n", littleFs.totalBytes(), littleFs.usedBytes(),
-                      littleFs.totalBytes() - littleFs.usedBytes(), 100 * littleFs.usedBytes() / littleFs.totalBytes());
+        io.printf("littlefs   %8i %8i %8i %3i%% /data\r\n", LittleFS.totalBytes(), LittleFS.usedBytes(),
+                  LittleFS.totalBytes() - LittleFS.usedBytes(), 100 * LittleFS.usedBytes() / LittleFS.totalBytes());
     }
 };
-#endif
-
 }
 
 FsCommand::FsCommand() {
@@ -212,7 +290,7 @@ FsCommand::FsCommand() {
     addCommand<FsCommands::CatCommand>("cat");
     addCommand<FsCommands::WriteCommand>("write");
     addCommand<FsCommands::LsCommand>("ls");
-    // addCommand<FsCommands::DfCommand>("df");
+    addCommand<FsCommands::DfCommand>("df");
 }
 #endif
 }

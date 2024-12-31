@@ -18,13 +18,15 @@
 
 #pragma once
 
-#include "Esp32BleMetrics.h"
-
-#include <esp_task_wdt.h>
-#include <NimBLEDevice.h>
-#include <mutex>
 #include <condition_variable>
 #include <Esp32Cli.h>
+#include <esp_task_wdt.h>
+#include <KeyValueStore.h>
+#include <mutex>
+#include <NimBLEDevice.h>
+#include <queue>
+#include <RingBuffer.h>
+#include <set>
 
 class Esp32BleUi : public NimBLECharacteristicCallbacks, public NimBLEServerCallbacks {
 public:
@@ -38,7 +40,7 @@ public:
 
     void onDisconnect(NimBLEServer* pServer, ble_gap_conn_desc* desc) override;
 
-    void setMetrics(std::shared_ptr<Esp32BleMetrics> metrics);
+    void setKeyValueStore(std::shared_ptr<KeyValueStore>);
 
 private:
     class Client;
@@ -52,6 +54,8 @@ private:
     }
 
     [[noreturn]] void processMetrics();
+
+    void processChangedMetricsBuffer();
 
     static void runMetrics(void* arg) {
         static_cast<Esp32BleUi*>(arg)->processMetrics();
@@ -70,5 +74,8 @@ private:
     std::mutex m_clientsMutex;
     std::vector<std::shared_ptr<Client> > m_clients;
     std::shared_ptr<Esp32Cli::Cli> m_cli;
-    std::shared_ptr<Esp32BleMetrics> m_metrics;
+    std::mutex m_metricsMutex;
+    std::shared_ptr<KeyValueStore> m_metrics;
+    LightweightMap<std::shared_ptr<const KeyValueStore::Value>> m_changedMetrics;
+    RingBuffer<uint8_t, 128> m_changedMetricsBuffer;
 };

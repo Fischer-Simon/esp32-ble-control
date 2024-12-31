@@ -31,7 +31,7 @@ class ScriptCommand : public Command {
 public:
     explicit ScriptCommand(std::shared_ptr<Cli> cli) : m_cli{std::move(cli)} {}
 
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override;
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv, const std::shared_ptr<Client>& client) const override;
 
     void printUsage(Print& output) const override;
 

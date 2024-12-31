@@ -37,6 +37,14 @@ public:
         return true;
     }
 
+    bool push(size_t size) {
+        if (m_bufferFill + size > Size) {
+            return false;
+        }
+        m_bufferFill += size;
+        return true;
+    }
+
     bool pop(size_t amount) {
         if (m_bufferFill < amount) {
             return false;
@@ -48,6 +56,10 @@ public:
 
     const T* data() {
         return m_buffer;
+    }
+
+    T* tail() {
+        return m_buffer + m_bufferFill;
     }
 
     size_t available() const {
@@ -80,6 +92,10 @@ public:
 
     void clearFlush() {
         m_shouldFlush = false;
+    }
+
+    static constexpr size_t capacity() {
+        return Size;
     }
 
 private:

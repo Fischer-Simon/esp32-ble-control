@@ -1,0 +1,26 @@
+{
+  "name": "JerryScript",
+  "version": "0.0.1",
+  "description": "JerryScript for ESP32",
+  "keywords": "esp32, js, javascript, jerryscript",
+  "build": {
+    "flags": [
+      "-DJERRY_NDEBUG",
+      "-DJERRY_GLOBAL_HEAP_SIZE=32",
+      "-DJERRY_MEM_STATS=1",
+      "-DJERRY_ERROR_MESSAGES=1",
+      "-DJERRY_LINE_INFO=1",
+      "-DJERRY_BUILTIN_DATE=0",
+      "-DJERRY_BUILTIN_JSON=0",
+      "-DJERRY_BUILTIN_REGEXP=1",
+      "-DJERRY_BUILTIN_BIGINT=1",
+      "-DJERRY_BUILTIN_CONTAINER=1",
+      "-DJERRY_BUILTIN_DATAVIEW=1",
+      "-DJERRY_BUILTIN_PROXY=0",
+      "-DJERRY_BUILTIN_REFLECT=0",
+      "-DJERRY_BUILTIN_TYPEDARRAY=1",
+      "-DJERRY_BUILTIN_SHAREDARRAYBUFFER=1",
+      "-DJERRY_BUILTIN_ATOMICS=0"
+    ]
+  }
+}

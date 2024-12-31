@@ -27,7 +27,7 @@
 #include <Esp32DeltaOta.h>
 #include <LedString.h>
 #include <LedManager.h>
-#include <Lua.h>
+#include <KeyValueStore.h>
 
 #if ESP32_BLE_CONTROL_ENABLE_WIFI
 #include <ArduinoMultiWiFi.h>
@@ -35,18 +35,21 @@
 #include "WiFiCredentialSource.h"
 #endif
 
-#include "CliCommand/LuaCommand.h"
 #include "CliCommand/LedCommand.h"
+#include <Js.h>
+#include <nvs.h>
+#include <CliCommand/JsCommand.h>
 
-fs::LittleFSFS littleFs;
 std::shared_ptr<Preferences> preferences;
 #if ESP32_BLE_CONTROL_ENABLE_WIFI
 std::shared_ptr<ArduinoMultiWiFi> wifiManager;
 #endif
+std::shared_ptr<KeyValueStore> keyValueStore;
 std::shared_ptr<Esp32BleUi> bleUi;
 std::shared_ptr<Esp32Cli::Cli> cli;
 std::shared_ptr<Esp32DeltaOta> ota;
-std::shared_ptr<Lua> lua;
+std::shared_ptr<Js> js;
+std::shared_ptr<Led::ColorManager> colorManager;
 std::shared_ptr<LedManager> ledManager;
 
 #if ESP32_BLE_CONTROL_ENABLE_WIFI
@@ -55,9 +58,8 @@ std::shared_ptr<Esp32Cli::TelnetServer> telnetServer;
 
 class TestDataCommand : public Esp32Cli::Command {
 public:
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override {
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv, const std::shared_ptr<Esp32Cli::Client>& client) const override {
         static const char* buf = "12345678";
-        io.println("Test 13");
 
         if (argv.size() != 2) {
             return;
@@ -65,7 +67,6 @@ public:
         size_t size = strtol(argv[1].c_str(), nullptr, 0);
         io.printf("Sending %i bytes\n", size);
         while (size > 0) {
-            Serial.printf("%i left\n", size);
             size_t writeSize = io.write(buf, std::min(size, 8u));
             size -= writeSize;
             if (writeSize == 0) {
@@ -79,7 +80,7 @@ public:
 
 class TestUploadCommand : public Esp32Cli::Command {
 public:
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override {
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv, const std::shared_ptr<Esp32Cli::Client>& client) const override {
         if (argv.size() != 5) {
             return;
         }
@@ -109,9 +110,16 @@ public:
     }
 };
 
+class MetricsCommand : public Esp32Cli::Command {
+public:
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv, const std::shared_ptr<Esp32Cli::Client>& client) const override {
+        keyValueStore->writeAllValuesToStream(io);
+    }
+};
+
 class CrashCommand : public Esp32Cli::Command {
 public:
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override {
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv, const std::shared_ptr<Esp32Cli::Client>& client) const override {
         *reinterpret_cast<int*>(0) = 42;
     }
 };
@@ -124,16 +132,20 @@ public:
     }
 }
 
+#include <argparse.h>
+
+using argparse::ArgumentParser;
+
 class PwmCommand : public Esp32Cli::Command {
 public:
-    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const override {
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv, const std::shared_ptr<Esp32Cli::Client>& client) const override {
         if (argv.size() != 2) {
             Esp32Cli::Cli::printUsage(io, commandName, *this);
             return;
         }
-        int dutyCycle = strtol(argv[1].c_str(), nullptr, 0);
-        ledcWrite(0, dutyCycle);
-        io.printf("Set duty cycle to %i\r\n", dutyCycle);
+        float dutyCycle = strtof(argv[1].c_str(), nullptr);
+        update_bldc_speed(dutyCycle);
+        io.printf("Set duty cycle to %f\r\n", dutyCycle);
     }
 
     void printUsage(Print& output) const override {
@@ -141,91 +153,33 @@ public:
     }
 };
 
-template<uint8_t i, typename Key, typename First, typename... Rest>
-struct TypeIndex {
-    static constexpr uint8_t value = TypeIndex<i + 1, Key, Rest...>::value;
-};
-
-template<uint8_t i, typename Key, typename... Rest>
-struct TypeIndex<i, Key, Key, Rest...> {
-    static constexpr uint8_t value = i;
-};
-
-
-bool operator!=(const HslColor& a, const HslColor& b) {
-    return a.H != b.H || a.S != b.S || a.L != b.L;
-}
-
-template<typename... Types>
-class Metrics : public Esp32BleMetrics {
+class ThermalCommand : public Esp32Cli::Command {
 public:
-    template<typename T>
-    static inline constexpr auto
-    typeIndex() -> uint8_t { return TypeIndex<0, T, Types...>::value; }
-
-    template<typename T>
-    void setValue(const char* metricNamespace, const char* objectName, const char* metricName, T value) {
-        constexpr uint8_t type = typeIndex<T>();
-        auto lock = std::unique_lock<std::mutex>(m_mutex);
-        auto& metricValues = std::get<type>(m_metricValues);
-        std::string nameStr = std::string{metricNamespace} + "/" + objectName + "/" + metricName;
-        const char* name = nameStr.c_str();
-        auto it = metricValues.find(name);
-        bool changed;
-        if (it == metricValues.end()) {
-            metricValues.set(name, value);
-            it = metricValues.find(name);
-            changed = true;
-        } else {
-            auto& currentValue = it->second;
-            changed = value != currentValue;
-            currentValue = value;
-        }
-
-        if (!changed || !m_metricsTask ||
-            m_changedMetricsBuffer.free() < (nameStr.size() + 1 + sizeof(type) + sizeof(value))) {
-            return;
-        }
-        m_changedMetricsBuffer.push(reinterpret_cast<const uint8_t*>(name), nameStr.size() + 1);
-        m_changedMetricsBuffer.push(&type, sizeof(type));
-        m_changedMetricsBuffer.push(reinterpret_cast<const uint8_t*>(&it->second), sizeof(value));
-        notifyTask();
+    void execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv, const std::shared_ptr<Esp32Cli::Client>& client) const override {
+        io.printf("%.1f °C\n", temperatureRead());
     }
-
-private:
-    std::tuple<LightweightMap<Types>...> m_metricValues;
 };
-
-using MyMetrics = Metrics<int, float, HslColor>;
-
-std::shared_ptr<MyMetrics> metrics;
-
-void updateLedMetrics(const LedView& ledView) {
-    metrics->setValue("led", ledView.getName().c_str(), "color", ledView.getAnimationTargetColor());
-    metrics->setValue("led", ledView.getName().c_str(), "brightness", ledView.getBrightness());
-}
 
 void setup() {
     Serial.begin(115200);
     Serial.setDebugOutput(true);
 
-    // while (!Serial.available()) {
-    //     delay(10);
-    // }
-
-    littleFs.begin(true, "/data", 8, "data");
+    LittleFS.begin(true, "/data", 8, "data");
     preferences = std::make_shared<Preferences>();
     preferences->begin("nvs");
 
+    char hostname[64];
     FILE* hostnameFile = fopen("/data/hostname", "r");
     if (hostnameFile) {
-        char hostname[64];
         fgets(hostname, 64, hostnameFile);
-        WiFiClass::setHostname(hostname);
         fclose(hostnameFile);
+    } else {
+        uint8_t baseMac[6];
+        esp_read_mac(baseMac, ESP_MAC_BT);
+        snprintf(hostname, 64, "%s%02X%02X%02X", CONFIG_IDF_TARGET "-", baseMac[3], baseMac[4], baseMac[5]);
     }
 
-    cli = Esp32Cli::Cli::create(WiFiClass::getHostname());
+    cli = Esp32Cli::Cli::create(hostname);
 
 #if ESP32_BLE_CONTROL_ENABLE_WIFI
     wifiManager = std::make_shared<ArduinoMultiWiFi>(
@@ -241,28 +195,36 @@ void setup() {
         recoveryMode();
     }
 
-    metrics = std::make_shared<MyMetrics>();
-    bleUi->setMetrics(metrics);
+    srand(esp_random());
 
-    ledManager = std::make_shared<LedManager>();
-    ledManager->loadColorsFromConfig("/data/etc/colors.json");
-    ledManager->loadLedsFromConfig("/data/etc/leds.json", &updateLedMetrics);
-    cli->addCommand<CliCommand::LedCommandGroup>("led", ledManager);
+    keyValueStore = std::make_shared<KeyValueStore>();
+    bleUi->setKeyValueStore(keyValueStore);
 
-    lua = std::make_shared<Lua>();
-    cli->addCommand<CliCommand::LuaCommandGroup>("lua", lua);
+    js = std::make_shared<Js>();
+    cli->addCommand<CliCommand::JsCommandGroup>("js", js, cli);
 
-    ledcSetup(0, 300000, 7);
-    ledcAttachPin(2, 0);
-    cli->addCommand<PwmCommand>("pwm");
+    colorManager = std::make_shared<Led::ColorManager>();
+    colorManager->loadColorsFromConfig("/data/lib/colors.json");
+    ledManager = std::make_shared<LedManager>(keyValueStore, colorManager, js);
+    ledManager->loadLedsFromConfig("/data/etc/leds.json");
+    cli->addCommand<CliCommand::LedCommandGroup>("led", ledManager, js);
 
+    cli->addCommand<MetricsCommand>("metrics");
     cli->addCommand<TestDataCommand>("test-data");
     cli->addCommand<TestUploadCommand>("test-upload");
     cli->addCommand<CrashCommand>("crash");
+    cli->addCommand<ThermalCommand>("thermal");
 
-
-    vTaskDelete(nullptr);
+    if (ledManager->isStartupAnimationEnabled()) {
+        std::vector<std::string> argv = {"led", "startup-animation"};
+        cli->executeCommand(Serial, argv);
+    }
+    if (!ledManager->isManualMode()) {
+        js->runIdleAnimationStartHandlers();
+    }
 }
 
 void loop() {
+    js->loop();
+    delay(16);
 }

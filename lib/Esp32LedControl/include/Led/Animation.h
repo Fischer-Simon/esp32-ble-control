@@ -27,17 +27,88 @@
 #include <random>
 #include <NeoPixelBus.h>
 
+#include "HslwColor.h"
+
 class LedView;
 
 namespace Led {
 struct Animation {
     using time_point = std::chrono::system_clock::time_point;
-    using duration = std::chrono::milliseconds;
+    // using duration = std::chrono::milliseconds;
+    using duration = std::chrono::duration<uint16_t, std::centi>;
 
-    /**
-     * The random seed used to calculate per LED random values.
-     */
-    std::default_random_engine::result_type randomSeed;
+    static constexpr duration durationFromMs(uint16_t ms) {
+        return duration{ms / 10};
+    }
+
+    struct RndDuration {
+        duration minValue{durationFromMs(0)};
+        duration maxValue{durationFromMs(0)};
+
+        /**
+        * Indicates the duration is given per led instead of the complete animation.
+        */
+        bool perLed{true};
+
+        /**
+        * Indicates the duration is a global delay value instead of a value increasing with each LED.
+        */
+        bool delayIsGlobal{false};
+
+        RndDuration() = default;
+
+        RndDuration(duration minValue_, duration maxValue_, bool perLed_, bool delayIsGlobal_)
+            : minValue{minValue_}, maxValue{maxValue_}, perLed{perLed_}, delayIsGlobal{delayIsGlobal_} {
+        }
+
+        duration eval(int ledCount, float offset = 1) const {
+            if (delayIsGlobal) {
+                offset = 1;
+            }
+            duration ret;
+            if (maxValue == minValue) {
+                ret = duration{static_cast<uint16_t>(offset * static_cast<float>(minValue.count()))};
+            } else {
+                ret = duration{
+                    static_cast<uint16_t>(offset * static_cast<float>(
+                                              minValue.count() + esp_random() % (maxValue.count() - minValue.count())))
+                };
+            }
+            if (!perLed) {
+                ret /= ledCount;
+            }
+            return ret;
+        }
+    };
+
+    struct PerLed {
+        /**
+        * Mapped LED index.
+        */
+        Led::index_t ledIndex;
+
+        /**
+        * Per LED animation duration.
+        */
+        duration ledDuration;
+
+        /**
+        * Per LED delay relative to the @link startTime of the animation.
+        */
+        duration ledDelay;
+
+        /**
+        * Factor for maximum animation brightness (65535 = 1.0)
+        */
+        uint16_t ledBrightnessFactor;
+
+        PerLed(Led::index_t ledIndex_, duration ledDuration_, duration ledDelay_, uint16_t ledBrightnessFactor_)
+            : ledIndex{ledIndex_},
+              ledDuration{ledDuration_},
+              ledDelay{ledDelay_},
+              ledBrightnessFactor{ledBrightnessFactor_} {
+        }
+    };
 
     /**
      * The blending used for the animation. Note that blending is done in RGB colorspace.
@@ -50,13 +121,15 @@ struct Animation {
     ease_func_t easing;
 
     /**
-     * For @link blending = @link Blending::Blend or @link Blending::Overwrite:
+     * For @link blending = @link Blending::Blend:
      * Color the LEDs will have after the animation has finished.
      *
      * For @link blending = @link Blending::Add:
      * Peak color value added to the LEDs color.
      */
-    HslColor targetColor;
+    HslwColor targetColor;
+
+    float targetBrightness;
 
     /**
      * Time the animation starts at.
@@ -64,15 +137,9 @@ struct Animation {
     time_point startTime;
 
     /**
-     * Duration of one LED animation.
+     * Calculated time based on @link startTime, @link ledDuration and @link ledDelay the animation will end at.
      */
-    duration ledDuration;
-
-    /**
-     * Animation start delay relative to the LED index.
-     * So the start delay of the fourth LED (with index 3) is 3 * ledDelay
-     */
-    duration ledDelay;
+    time_point endTime;
 
     /**
      * Number of cycles the animation runs. One half cycle plays the animation forward once. Two play the animation
@@ -80,20 +147,15 @@ struct Animation {
      * Three play the animation forward, reverse and forward again. And so on.
      * The complete LED animation takes @link ledDuration time. So for three half cycles each one takes a third of that.
      */
-    uint8_t halfCycles;
+    int8_t halfCycles;
 
     /**
-     * Calculated time based on @link startTime, @link ledDuration and @link ledDelay the animation will end at.
+     * Per LED animation information
      */
-    time_point endTime;
+    std::vector<PerLed> leds;
 
-    /**
-     * LED indices affected by this animation.
-     */
-    std::vector<Led::index_t> leds;
+    std::vector<std::weak_ptr<LedView> > affectedLedViews;
 
-    std::vector<std::weak_ptr<LedView>> affectedLedViews;
-
-    static duration parseDuration(const std::string& durationStr);
+    static RndDuration parseDuration(std::string durationStr);
 };
 }

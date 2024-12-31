@@ -107,7 +107,7 @@ void Esp32DeltaOta::markProgramAsNew() {
 void Esp32DeltaOta::resetEsp() {
     DummyStream io;
     std::vector<std::string> argv = {"reset", "200"};
-    (new Esp32Cli::ResetCommand)->execute(io, "reset", argv);
+    (new Esp32Cli::ResetCommand)->execute(io, "reset", argv, nullptr);
 }
 
 void Esp32DeltaOta::setProgramState(ProgramState state) {

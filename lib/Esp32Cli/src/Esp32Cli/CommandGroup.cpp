@@ -42,7 +42,7 @@ void CommandGroup::printHelp(Print& output, const std::string& commandName, std:
     }
 }
 
-void CommandGroup::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv) const {
+void CommandGroup::execute(Stream& io, const std::string& commandName, std::vector<std::string>& argv, const std::shared_ptr<Client>& client) const {
     if (argv.size() < 2) {
         Cli::printUsage(io, commandName, *this);
         return;
@@ -55,7 +55,7 @@ void CommandGroup::execute(Stream& io, const std::string& commandName, std::vect
     }
 
     argv.erase(argv.begin());
-    command->execute(io, commandName + " " + argv[0], argv);
+    command->execute(io, commandName + " " + argv[0], argv, client);
 }
 
 void CommandGroup::printUsage(Print& output) const {

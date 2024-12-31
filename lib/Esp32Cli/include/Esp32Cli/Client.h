@@ -18,15 +18,19 @@
 
 #pragma once
 
+#include <list>
+
 #include "Esp32Cli.h"
 
 namespace Esp32Cli {
-class Client : public Stream {
+class Client : public Stream, public std::enable_shared_from_this<Client> {
 public:
     enum class ExecType {
         Blocking,
         NonBlocking,
     };
+
+    using OnDisconnectEventHandlerEntry = std::pair<void*, std::function<void()>>;
 
     /**
      * Maximum size of the data in the argv array of the {@link ParserState}.
@@ -40,20 +44,44 @@ public:
      * Read available data and execute parsed commands.
      *
      * Multiple commands can be separated either via line breaks or semicolon.
-     * Line breaks also include carriage returns, all of the following counts as a line break:
+     * Line breaks also include carriage returns, all the following counts as a line break:
      * \\n, \\r, \\r\\n, \\n\\r.
      *
      * Lines starting with # will be ignored.
      *
-     * @param execType Non blocking returns immediately if no more data are available for read.
+     * @param execType Non-blocking returns immediately if no more data are available for read.
      */
     virtual void executeCommandLine(ExecType execType);
+
+    void addDisconnectEventListener(void* owner, std::function<void()> callback) {
+        m_onDisconnectEventHandlers.emplace_back(owner, std::move(callback));
+    }
+
+    void removeDisconnectEventListener(void* owner) {
+        auto it = m_onDisconnectEventHandlers.begin();
+        while (it != m_onDisconnectEventHandlers.end()) {
+            if (it->first == owner) {
+                it = m_onDisconnectEventHandlers.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
 
 protected:
     /**
      * Callback executed when a command finished.
      */
     virtual void onCommandEnd() {
+    }
+
+    /**
+    * Callback to execute by implementations when the client connection ends.
+    */
+    void onDisconnect() const {
+        for (const auto& eventHandler : m_onDisconnectEventHandlers) {
+            eventHandler.second();
+        }
     }
 
     std::shared_ptr<Cli> m_cli;
@@ -77,5 +105,6 @@ private:
             argvSize++;
         }
     } m_parserState{};
+    std::list<OnDisconnectEventHandlerEntry> m_onDisconnectEventHandlers;
 };
 }
