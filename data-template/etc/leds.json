@@ -1,6 +1,6 @@
 {
   "Test LEDs": {
-    "type": "NeoPixelApa104",
+    "type": "NeoPixelRgb",
     "pixelCount": 20,
     "pin": 1,
     "rmtChannel": 0,
